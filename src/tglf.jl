@@ -800,6 +800,13 @@ function load(input_tglf::InputTGLF, filename::String)
     return input_tglf
 end
 
+"""
+    run_tglf(input_tglf::InputTGLF)
+
+Run TGLF starting from a InputTGLF.
+
+Returns a `flux_solution` structure
+"""
 function run_tglf(input_tglf::InputTGLF)
     folder = mktempdir()
 
@@ -846,9 +853,20 @@ function run_tglf(input_tglf::InputTGLF)
     return sol
 end
 
+"""
+    run_tglf(input_tglf::InputTGLF)
+
+Run TGLF starting from a vector of InputTGLFs.
+
+NOTE: Each run is done asyncronously (ie. in separate parallel processes)
+
+Returns a `flux_solution` structure
+"""
 function run_tglf(input_tglfs::Vector{InputTGLF})
     return collect(asyncmap(input_tglf -> TGLFNN.run_tglf(input_tglf), input_tglfs))
 end
+
+export run_tglf
 
 """
     save(input::Union{InputTGLF, InputCGYRO}, filename::AbstractString)
@@ -909,6 +927,7 @@ function compare_two_input_tglfs(itp_1::TGLFNN.InputTGLF, itp_2::TGLFNN.InputTGL
     return itp_diff
 end
 
+export compare_two_input_tglfs
 
 """
     parse_out_tglf_gbflux(
@@ -940,6 +959,13 @@ function parse_out_tglf_gbflux(
     return out
 end
 
+"""
+    input_qlgyro(input_qlgyro::InputQLGYRO, input_cgyro::InputCGYRO)
+
+Run QLGYRO starting from a InputQLGYRO and InputCGYRO
+
+Returns a `flux_solution` structure
+"""
 function run_qlgyro(input_qlgyro::InputQLGYRO, input_cgyro::InputCGYRO)
     folder = mktempdir()
 
@@ -984,7 +1010,18 @@ function run_qlgyro(input_qlgyro::InputQLGYRO, input_cgyro::InputCGYRO)
     return sol
 end
 
+"""
+    run_qlgyro(input_qlgyros::Vector{InputQLGYRO}, input_cgyros::Vector{InputCGYRO})
+
+Run QLGYRO starting from a vectors of InputQLGYRO and InputCGYRO
+
+NOTE: Each run is done sequentially, one after the other
+
+Returns a vector of `flux_solution` structures
+"""
 function run_qlgyro(input_qlgyros::Vector{InputQLGYRO}, input_cgyros::Vector{InputCGYRO})
+    @assert length(input_qlgyros) == length(input_cgyros)
     return collect(map((input_qlgyro, input_cgyro) -> TGLFNN.run_qlgyro(input_qlgyro, input_cgyro), input_qlgyros, input_cgyros))
 end
 
+export run_qlgyro

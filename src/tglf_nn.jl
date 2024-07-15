@@ -6,9 +6,9 @@ import StatsBase
 import Measurements
 import BSON
 
-#= ==================================== =#
-# structs/constructors for the TGLFmodel
-#= ==================================== =#
+#= ====================================== =#
+#  structs/constructors for the TGLFmodel
+#= ====================================== =#
 # TGLFmodel abstract type, since we could have different models
 abstract type TGLFmodel end
 
@@ -138,9 +138,9 @@ function loadmodel(filename::AbstractString)
     end
 end
 
-#= ================================================== =#
-# functions to get the fluxes solution
-#= ================================================== =#
+#= ==================================== =#
+#  functions to get the fluxes solution
+#= ==================================== =#
 function flux_array(fluxmodel::TGLFNNmodel, x::AbstractMatrix; warn_nn_train_bounds::Bool=true)
     return hcat(collect(map(x0 -> flux_array(fluxmodel, x0; warn_nn_train_bounds), eachslice(x; dims=2)))...)
 end
@@ -264,6 +264,17 @@ end
 #= ========== =#
 #  run_tglfnn 
 #= ========== =#
+"""
+    run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
+
+Run TGLFNN starting from a InputTGLF, using a specific `model_filename`.
+
+If the model is an ensemble of NNs, then the output can be uncertain (using the Measurements.jl package).
+
+The warn_nn_train_bounds checks against the standard deviation of the inputs to warn if evaluation is likely outside of training bounds.
+
+Returns a `flux_solution` structure
+"""
 function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
     tglfmod = TGLFNN.loadmodelonce(model_filename)
     inputs = zeros(length(tglfmod.xnames))
@@ -281,6 +292,19 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
     return sol
 end
 
+"""
+    run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
+
+Run TGLFNN for multiple InputTGLF, using a specific `model_filename`.
+
+This is more efficient than running TGLFNN on each individual InputTGLFs.
+
+If the model is an ensemble of NNs, then the output can be uncertain (using the Measurements.jl package).
+
+The warn_nn_train_bounds checks against the standard deviation of the inputs to warn if evaluation is likely outside of training bounds.
+
+Returns a vector of `flux_solution` structures
+"""
 function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
     tglfmod = TGLFNN.loadmodelonce(model_filename)
     inputs = zeros(length(tglfmod.xnames), length(input_tglfs))
@@ -301,6 +325,17 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
     return sol
 end
 
+"""
+    run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)::Dict
+
+Run TGLFNN from a dictionary, using a specific `model_filename`.
+
+If the model is an ensemble of NNs, then the output can be uncertain (using the Measurements.jl package).
+
+The warn_nn_train_bounds checks against the standard deviation of the inputs to warn if evaluation is likely outside of training bounds.
+
+Returns a dictionary with fluxes
+"""
 function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)::Dict
     tglfmod = loadmodelonce(model_filename)
     xnames = [replace(name, "_log10" => "") for name in tglfmod.xnames]
@@ -309,3 +344,5 @@ function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, w
     ynames = [replace(name, "OUT_" => "") for name in tglfmod.ynames]
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames))
 end
+
+export run_tglfnn
