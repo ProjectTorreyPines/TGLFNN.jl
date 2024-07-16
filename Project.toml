@@ -13,8 +13,8 @@ Memoize = "c03570c3-d221-55d1-a50c-7939bbd78826"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-BSON = "0.3"
-Flux = "0.14"
+BSON = ">= 0.3"
+Flux = ">= 0.14"
 Measurements = "2"
-Memoize = "0.4"
-StatsBase = "0.34"
+Memoize = ">= 0.4"
+StatsBase = ">= 0.34"
