@@ -11,3 +11,6 @@ IMAS = "13ead8c1-b7d1-41bb-a6d0-5b8b65ed587a"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
 Memoize = "c03570c3-d221-55d1-a50c-7939bbd78826"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
+[compat]
+StatsBase = "0.34"
