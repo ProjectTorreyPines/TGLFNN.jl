@@ -945,7 +945,7 @@ function parse_out_tglf_gbflux(lines::String; outnames::NTuple{4,String}=("Gam/G
             k += 1
             out[t*"_all_ions"] = Float64[]
             for s in 1:ns-1
-                out[t*"_ion"*s] = vals[k]
+                out[t*"_ion$s"] = vals[k]
                 push!(out[t*"_all_ions"], vals[k])
                 k += 1
             end
