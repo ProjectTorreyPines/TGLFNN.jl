@@ -830,7 +830,8 @@ function run_tglf(input_tglf::InputTGLF)
         tmp = open(joinpath(folder, "out.tglf.gbflux"), "r") do io
             return read(io, String)
         end
-        fluxes = parse_out_tglf_gbflux(tmp)
+
+        parse_out_tglf_gbflux(tmp)
 
     catch e
         # show last 100 lines of  chease.output
@@ -842,11 +843,11 @@ function run_tglf(input_tglf::InputTGLF)
     end
 
     sol = IMAS.flux_solution(
-        fluxes["Gam/Gam_GB_elec"],
-        fluxes["Pi/Pi_GB_ions"],
         fluxes["Q/Q_GB_elec"],
-        fluxes["Q/Q_GB_ions"]
-    )
+        fluxes["Q/Q_GB_ions"],
+        fluxes["Gam/Gam_GB_elec"],
+        fluxes["Gam/Gam_GB_all_ions"],
+        fluxes["Pi/Pi_GB_ions"])
 
     rm(folder; recursive=true)
 
@@ -930,30 +931,25 @@ end
 export compare_two_input_tglfs
 
 """
-    parse_out_tglf_gbflux(
-    	lines::AbstractString;
-    	outnames::AbstractVector{<:AbstractString}=["Gam/Gam_GB", "Q/Q_GB", "Pi/Pi_GB", "S/S_GB"])
+    parse_out_tglf_gbflux(lines::String; outnames=["Gam/Gam_GB", "Q/Q_GB", "Pi/Pi_GB", "S/S_GB"])
 
-Parse out.tglf.gbflux file and return fluxes with given outnames
+parse out.tglf.gbflux file into a dictionary with possibility of using custom names for outputs
 """
-function parse_out_tglf_gbflux(
-    lines::AbstractString;
-    outnames::AbstractVector{<:AbstractString}=["Gam/Gam_GB", "Q/Q_GB", "Pi/Pi_GB", "S/S_GB"])
-
-    vals = collect(map(x -> parse(Float64, x), split.(lines)))
+function parse_out_tglf_gbflux(lines::String; outnames::NTuple{4,String}=("Gam/Gam_GB", "Q/Q_GB", "Pi/Pi_GB", "S/S_GB"))
+    vals = map(x -> parse(Float64, x), split.(lines))
     ns = Int(length(vals) / length(outnames))
-    species = vcat("elec", ["ion$i" for i in 1:ns-1])
     out = Dict()
     let k = 1
         for t in outnames
-            out[t*"_ions"] = 0.0
-            for s in species
-                out[t*"_"*s] = vals[k]
-                if startswith(s, "ion")
-                    out[t*"_ions"] += vals[k]
-                end
+            out[t*"_elec"] = vals[k]
+            k += 1
+            out[t*"_all_ions"] = Float64[]
+            for s in 1:ns-1
+                out[t*"_ion$s"] = vals[k]
+                push!(out[t*"_all_ions"], vals[k])
                 k += 1
             end
+            out[t*"_ions"] = sum(out[t*"_all_ions"])
         end
     end
     return out
@@ -999,11 +995,11 @@ function run_qlgyro(input_qlgyro::InputQLGYRO, input_cgyro::InputCGYRO)
     end
 
     sol = IMAS.flux_solution(
-        fluxes["Gam/Gam_GB_elec"],
-        fluxes["Pi/Pi_GB_ions"],
         fluxes["Q/Q_GB_elec"],
-        fluxes["Q/Q_GB_ions"]
-    )
+        fluxes["Q/Q_GB_ions"],
+        fluxes["Gam/Gam_GB_elec"],
+        fluxes["Gam/Gam_GB_all_ions"],
+        fluxes["Pi/Pi_GB_ions"])
 
     rm(folder; recursive=true)
 
