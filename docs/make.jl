@@ -21,7 +21,7 @@ makedocs(;
     format=Documenter.HTML(),
     sitename="TGLFNN",
     checkdocs=:none,
-    pages=["index.md", "api.md", "License" => "license.md", "Notice" => "notice.md"]
+    pages=["index.md", "models.md", "api.md", "License" => "license.md", "Notice" => "notice.md"]
 )
 
 # Deploy docs
