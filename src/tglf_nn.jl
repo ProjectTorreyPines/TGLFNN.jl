@@ -25,10 +25,12 @@ struct TGLFNNmodel <: TGLFmodel
     yσ::Vector{Float32}
     xbounds::Array{Float32}
     ybounds::Array{Float32}
+    nions::Int
 end
 
 # constructor that always converts to the correct types
 function TGLFNNmodel(fluxmodel::Flux.Chain, name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
+    nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", xnames)))) - 1
     return TGLFNNmodel(
         fluxmodel,
         String(name),
@@ -40,7 +42,8 @@ function TGLFNNmodel(fluxmodel::Flux.Chain, name, date, xnames, ynames, xm, xσ,
         Float32.(reshape(ym, length(ym))),
         Float32.(reshape(yσ, length(yσ))),
         Float32.(xbounds),
-        Float32.(ybounds)
+        Float32.(ybounds),
+        nions
     )
 end
 
@@ -109,7 +112,12 @@ end
 function dict2mod(dict::AbstractDict)
     args = []
     for name in fieldnames(TGLFNNmodel)
-        push!(args, dict[name])
+        if name == :nions
+            nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", dict[:xnames])))) - 1
+            push!(args, nions)
+        else
+            push!(args, dict[name])
+        end
     end
     return TGLFNNmodel(args...)
 end
