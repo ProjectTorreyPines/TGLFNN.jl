@@ -47,7 +47,16 @@ function TGLFNNmodel(fluxmodel::Flux.Chain, name, date, xnames, ynames, xm, xσ,
     )
 end
 
-# constructor where the date is always filled out
+function Base.show(io::IO, mime::MIME"text/plain", model::TGLFNNmodel)
+    println(io, "TGLFNNmodel")
+    println(io, "name: $(length(model.name))")
+    println(io, "date: $(model.date)")
+    println(io, "nions: $(model.nions)")
+    println(io, "xnames ($(length(model.xnames))): $(model.xnames)")
+    return println(io, "ynames ($(length(model.ynames))): $(model.ynames)")
+end
+
+# constructor where the date and ions is always filled out
 function TGLFNNmodel(fluxmodel::Flux.Chain, name, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
     date = Dates.now()
     return TGLFNNmodel(fluxmodel, name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
@@ -56,6 +65,12 @@ end
 # TGLFNNensemble
 struct TGLFNNensemble <: TGLFmodel
     models::Vector{TGLFNNmodel}
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", ensemble::TGLFNNensemble)
+    println(io, "TGLFNNensemble")
+    println(io, "n models: $(length(ensemble.models))")
+    return show(io, mime, ensemble.models[1])
 end
 
 function TGLFNNensemble(models::Vector{<:Any})
