@@ -247,7 +247,7 @@ function flux_array(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_n
 end
 
 function flux_solution(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
-    return IMAS.flux_solution(flux_array(fluxmodel, collect(args); uncertain, warn_nn_train_bounds)...)
+    return flux_solution(flux_array(fluxmodel, collect(args); uncertain, warn_nn_train_bounds)...)
 end
 
 #= ======================= =#
@@ -321,7 +321,7 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
         end
     end
     tmp = flux_array(tglfmod, inputs; uncertain, warn_nn_train_bounds)
-    sol = [IMAS.flux_solution(tmp[:, i]...) for i in eachindex(input_tglfs)]
+    sol = [flux_solution(tmp[:, i]...) for i in eachindex(input_tglfs)]
     return sol
 end
 
@@ -343,6 +343,52 @@ function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, w
     y = tglfmod(x; uncertain, warn_nn_train_bounds)
     ynames = [replace(name, "OUT_" => "") for name in tglfmod.ynames]
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames))
+end
+
+"""
+    flux_solution(xx::Vararg{T}) where {T<:Real}
+
+Constructor used to handle PARTICLE_FLUX_i entered as a set of scalars instead of an array
+
+    flux_solution(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+
+results in
+
+    Qe = 1.0
+    Qi = 2.0
+    Γe = 3.0
+    Γi = [4.0, 5.0]
+    Πi = 6.0
+
+NOTE: for backward compatibility with old TGLF-NN models, if number of arguments is 4 then
+
+    flux_solution(1.0, 2.0, 3.0, 4.0)
+
+results in
+
+    Qe = 3.0
+    Qi = 4.0
+    Γe = 1.0
+    Γi = []
+    Πi = 2.0
+"""
+function flux_solution(xx::Vararg{T}) where {T<:Real}
+    n_fields = length(xx)
+    if n_fields == 4
+        ENERGY_FLUX_e = 3
+        ENERGY_FLUX_i = 4
+        PARTICLE_FLUX_e = 1
+        STRESS_TOR_i = 2
+        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
+    else
+        ENERGY_FLUX_e = n_fields - 1
+        ENERGY_FLUX_i = n_fields
+        PARTICLE_FLUX_e = 1
+        PARTICLE_FLUX_i = 2:n_fields-3
+        STRESS_TOR_i = n_fields - 2
+        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
+    end
+    return sol
 end
 
 export run_tglfnn
