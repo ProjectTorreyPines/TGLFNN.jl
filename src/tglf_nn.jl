@@ -150,7 +150,7 @@ function loadmodel(filename::AbstractString)
     else
         fullpath = dirname(@__DIR__) * "/models/" * filename
         if !isfile(fullpath)
-            error("TGLFNN model $filename does not exist. Possible nn models are:\n$(join(readdir(dirname(@__DIR__) * "/models/"),"\n",))")
+            error("TGLFNN model $filename does not exist. Possible nn models are:\n    $(join(available_models(),"\n    ",))")
         end
     end
     savedict = BSON.load(fullpath, @__MODULE__)
@@ -159,6 +159,10 @@ function loadmodel(filename::AbstractString)
     else
         return dict2mod(savedict)
     end
+end
+
+function available_models()
+    return [replace(model, ".bson"=>"") for model in readdir(dirname(@__DIR__) * "/models/") if endswith(model,".bson")]
 end
 
 #= ==================================== =#
