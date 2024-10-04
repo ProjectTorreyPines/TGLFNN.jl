@@ -11,9 +11,9 @@ For more details, see the [online documentation](https://projecttorreypines.gith
 
 ![Docs](https://github.com/ProjectTorreyPines/TGLFNN.jl/actions/workflows/make_docs.yml/badge.svg)
 
+## Citation
 If this software contributes to an academic publication, please cite it as follows:
 
-## Citation
 TGLF-NN:
 > Tom Neiser, Orso Meneghini, Sterling Smith, Joseph McClenaghan, David Orozco, Joseph Hall, Gary Staebler, Emily Belli, Jeff Candy, _Database generation for validation of TGLF and retraining of neural network accelerated TGLF-NN_, APS Division of Plasma Physics Meeting Abstracts (2022)
 
