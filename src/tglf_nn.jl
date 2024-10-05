@@ -198,39 +198,6 @@ function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bou
     xn = (x32 .- fluxmodel.xm) ./ fluxmodel.xσ
     yn = fluxmodel.fluxmodel(xn)
     y = yn .* fluxmodel.yσ .+ fluxmodel.ym
-    if natrhonorm
-        # Convert name to index
-        name_to_indx = Dict{String,Vector{Float32}}()
-        for xi in 1:length(fluxmodel.xnames)
-            vals = get!(Vector{Float32}, name_to_indx, fluxmodel.xnames[xi])
-            push!(vals, xi)
-        end
-        taus2 = x[convert(Int, name_to_indx["TAUS_2"][1]), :]
-        as2 = x[convert(Int, name_to_indx["AS_2"][1]), :]
-        rlns1 = x[convert(Int, name_to_indx["RLNS_1"][1]), :]
-        rlts1 = x[convert(Int, name_to_indx["RLTS_1"][1]), :]
-        rlns2 = x[convert(Int, name_to_indx["RLNS_2"][1]), :]
-        rlts2 = x[convert(Int, name_to_indx["RLTS_2"][1]), :]
-        ptot = 1 .+ as2 .* taus2
-        adpdr = (rlns1 .+ rlts1) .+ as2 .* taus2 .* (rlns2 .+ rlts2)
-        for i in 1:size(adpdr)[1]
-            if abs(adpdr[i]) < 0.001
-                adpdr[i] = 0.001 * sign(adpdr[i])
-            end
-        end
-        aoverLp = adpdr ./ ptot
-        nat = (1 ./ taus2) .* (1 ./ aoverLp) .^ 2 .* (1 ./ (2 .* taus2)) .* (0.557^2)
-        for k in 1:size(y)[1]
-            y[k, :] ./= nat
-        end
-    end
-    # for iy in 1:length(y)
-    #     if any(y[iy].<fluxmodel.ybounds[iy,1])
-    #         println("Extrapolation warning on $(fluxmodel.ynames[iy])=$(minimum(y[iy,:])) is below bound of $(fluxmodel.ybounds[iy,1])")
-    #     elseif any(y[iy].>fluxmodel.ybounds[iy,2])
-    #         println("Extrapolation warning on $(fluxmodel.ynames[iy])=$(maximum(y[iy,:])) is above bound of $(fluxmodel.ybounds[iy,2])")
-    #     end
-    # end
     return eltype(x).(y)
 end
 
@@ -313,7 +280,6 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
         else
             value = getfield(input_tglf, Symbol(item))
         end
-        # display("input.tglf[$item] -> $value")
         inputs[k] = value
     end
     sol = tglfmod(inputs...; uncertain, warn_nn_train_bounds)
@@ -344,7 +310,6 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
             else
                 value = getfield(input_tglf, Symbol(item))
             end
-            # display("input.tglf[$item] -> $value")
             inputs[k, i] = value
         end
     end
