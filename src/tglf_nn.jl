@@ -5,6 +5,7 @@ import Memoize
 import StatsBase
 import Measurements
 import BSON
+import ONNXNaiveNASflux
 
 #= ====================================== =#
 #  structs/constructors for the TGLFmodel
