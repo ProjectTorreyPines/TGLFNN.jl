@@ -441,7 +441,7 @@ function InputTGLF(
     k = IMAS.gacode_units.k # erg/eV
     mp = IMAS.gacode_units.mp # g
     me = IMAS.gacode_units.me # g
-    md = 2 * mp # g
+    md = IMAS.gacode_units.md # g
     m_to_cm = IMAS.gacode_units.m_to_cm
     m³_to_cm³ = IMAS.gacode_units.m³_to_cm³
     T_to_Gauss = IMAS.gacode_units.T_to_Gauss
