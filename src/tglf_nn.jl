@@ -5,6 +5,7 @@ import Memoize
 import StatsBase
 import Measurements
 import BSON
+import ONNXNaiveNASflux
 
 #= ====================================== =#
 #  structs/constructors for the TGLFmodel
@@ -25,10 +26,12 @@ struct TGLFNNmodel <: TGLFmodel
     yσ::Vector{Float32}
     xbounds::Array{Float32}
     ybounds::Array{Float32}
+    nions::Int
 end
 
 # constructor that always converts to the correct types
 function TGLFNNmodel(fluxmodel::Flux.Chain, name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
+    nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", xnames)))) - 1
     return TGLFNNmodel(
         fluxmodel,
         String(name),
@@ -40,11 +43,21 @@ function TGLFNNmodel(fluxmodel::Flux.Chain, name, date, xnames, ynames, xm, xσ,
         Float32.(reshape(ym, length(ym))),
         Float32.(reshape(yσ, length(yσ))),
         Float32.(xbounds),
-        Float32.(ybounds)
+        Float32.(ybounds),
+        nions
     )
 end
 
-# constructor where the date is always filled out
+function Base.show(io::IO, mime::MIME"text/plain", model::TGLFNNmodel)
+    println(io, "TGLFNNmodel")
+    println(io, "name: $(length(model.name))")
+    println(io, "date: $(model.date)")
+    println(io, "nions: $(model.nions)")
+    println(io, "xnames ($(length(model.xnames))): $(model.xnames)")
+    return println(io, "ynames ($(length(model.ynames))): $(model.ynames)")
+end
+
+# constructor where the date and ions is always filled out
 function TGLFNNmodel(fluxmodel::Flux.Chain, name, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
     date = Dates.now()
     return TGLFNNmodel(fluxmodel, name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
@@ -53,6 +66,12 @@ end
 # TGLFNNensemble
 struct TGLFNNensemble <: TGLFmodel
     models::Vector{TGLFNNmodel}
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", ensemble::TGLFNNensemble)
+    println(io, "TGLFNNensemble")
+    println(io, "n models: $(length(ensemble.models))")
+    return show(io, mime, ensemble.models[1])
 end
 
 function TGLFNNensemble(models::Vector{<:Any})
@@ -109,7 +128,12 @@ end
 function dict2mod(dict::AbstractDict)
     args = []
     for name in fieldnames(TGLFNNmodel)
-        push!(args, dict[name])
+        if name == :nions
+            nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", dict[:xnames])))) - 1
+            push!(args, nions)
+        else
+            push!(args, dict[name])
+        end
     end
     return TGLFNNmodel(args...)
 end
@@ -127,7 +151,7 @@ function loadmodel(filename::AbstractString)
     else
         fullpath = dirname(@__DIR__) * "/models/" * filename
         if !isfile(fullpath)
-            error("TGLFNN model $filename does not exist. Possible nn models are:\n$(join(readdir(dirname(@__DIR__) * "/models/"),"\n",))")
+            error("TGLFNN model $filename does not exist. Possible nn models are:\n    $(join(available_models(),"\n    ",))")
         end
     end
     savedict = BSON.load(fullpath, @__MODULE__)
@@ -136,6 +160,10 @@ function loadmodel(filename::AbstractString)
     else
         return dict2mod(savedict)
     end
+end
+
+function available_models()
+    return [replace(model, ".bson"=>"") for model in readdir(dirname(@__DIR__) * "/models/") if endswith(model,".bson")]
 end
 
 #= ==================================== =#
@@ -170,39 +198,6 @@ function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bou
     xn = (x32 .- fluxmodel.xm) ./ fluxmodel.xσ
     yn = fluxmodel.fluxmodel(xn)
     y = yn .* fluxmodel.yσ .+ fluxmodel.ym
-    if natrhonorm
-        # Convert name to index
-        name_to_indx = Dict{String,Vector{Float32}}()
-        for xi in 1:length(fluxmodel.xnames)
-            vals = get!(Vector{Float32}, name_to_indx, fluxmodel.xnames[xi])
-            push!(vals, xi)
-        end
-        taus2 = x[convert(Int, name_to_indx["TAUS_2"][1]), :]
-        as2 = x[convert(Int, name_to_indx["AS_2"][1]), :]
-        rlns1 = x[convert(Int, name_to_indx["RLNS_1"][1]), :]
-        rlts1 = x[convert(Int, name_to_indx["RLTS_1"][1]), :]
-        rlns2 = x[convert(Int, name_to_indx["RLNS_2"][1]), :]
-        rlts2 = x[convert(Int, name_to_indx["RLTS_2"][1]), :]
-        ptot = 1 .+ as2 .* taus2
-        adpdr = (rlns1 .+ rlts1) .+ as2 .* taus2 .* (rlns2 .+ rlts2)
-        for i in 1:size(adpdr)[1]
-            if abs(adpdr[i]) < 0.001
-                adpdr[i] = 0.001 * sign(adpdr[i])
-            end
-        end
-        aoverLp = adpdr ./ ptot
-        nat = (1 ./ taus2) .* (1 ./ aoverLp) .^ 2 .* (1 ./ (2 .* taus2)) .* (0.557^2)
-        for k in 1:size(y)[1]
-            y[k, :] ./= nat
-        end
-    end
-    # for iy in 1:length(y)
-    #     if any(y[iy].<fluxmodel.ybounds[iy,1])
-    #         println("Extrapolation warning on $(fluxmodel.ynames[iy])=$(minimum(y[iy,:])) is below bound of $(fluxmodel.ybounds[iy,1])")
-    #     elseif any(y[iy].>fluxmodel.ybounds[iy,2])
-    #         println("Extrapolation warning on $(fluxmodel.ynames[iy])=$(maximum(y[iy,:])) is above bound of $(fluxmodel.ybounds[iy,2])")
-    #     end
-    # end
     return eltype(x).(y)
 end
 
@@ -247,7 +242,7 @@ function flux_array(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_n
 end
 
 function flux_solution(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
-    return IMAS.flux_solution(flux_array(fluxmodel, collect(args); uncertain, warn_nn_train_bounds)...)
+    return flux_solution(flux_array(fluxmodel, collect(args); uncertain, warn_nn_train_bounds)...)
 end
 
 #= ======================= =#
@@ -285,7 +280,6 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
         else
             value = getfield(input_tglf, Symbol(item))
         end
-        # display("input.tglf[$item] -> $value")
         inputs[k] = value
     end
     sol = tglfmod(inputs...; uncertain, warn_nn_train_bounds)
@@ -316,12 +310,11 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
             else
                 value = getfield(input_tglf, Symbol(item))
             end
-            # display("input.tglf[$item] -> $value")
             inputs[k, i] = value
         end
     end
     tmp = flux_array(tglfmod, inputs; uncertain, warn_nn_train_bounds)
-    sol = [IMAS.flux_solution(tmp[:, i]...) for i in eachindex(input_tglfs)]
+    sol = [flux_solution(tmp[:, i]...) for i in eachindex(input_tglfs)]
     return sol
 end
 
@@ -343,6 +336,52 @@ function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, w
     y = tglfmod(x; uncertain, warn_nn_train_bounds)
     ynames = [replace(name, "OUT_" => "") for name in tglfmod.ynames]
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames))
+end
+
+"""
+    flux_solution(xx::Vararg{T}) where {T<:Real}
+
+Constructor used to handle PARTICLE_FLUX_i entered as a set of scalars instead of an array
+
+    flux_solution(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+
+results in
+
+    Qe = 1.0
+    Qi = 2.0
+    Γe = 3.0
+    Γi = [4.0, 5.0]
+    Πi = 6.0
+
+NOTE: for backward compatibility with old TGLF-NN models, if number of arguments is 4 then
+
+    flux_solution(1.0, 2.0, 3.0, 4.0)
+
+results in
+
+    Qe = 3.0
+    Qi = 4.0
+    Γe = 1.0
+    Γi = []
+    Πi = 2.0
+"""
+function flux_solution(xx::Vararg{T}) where {T<:Real}
+    n_fields = length(xx)
+    if n_fields == 4
+        ENERGY_FLUX_e = 3
+        ENERGY_FLUX_i = 4
+        PARTICLE_FLUX_e = 1
+        STRESS_TOR_i = 2
+        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
+    else
+        ENERGY_FLUX_e = n_fields - 1
+        ENERGY_FLUX_i = n_fields
+        PARTICLE_FLUX_e = 1
+        PARTICLE_FLUX_i = 2:n_fields-3
+        STRESS_TOR_i = n_fields - 2
+        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
+    end
+    return sol
 end
 
 export run_tglfnn
