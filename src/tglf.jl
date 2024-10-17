@@ -435,23 +435,25 @@ function InputTGLF(
     gridpoint_cp::AbstractVector{Int},
     sat::Symbol,
     electromagnetic::Bool,
-    lump_ions::Bool
-)
-    e = IMAS.gacode_units.e
-    k = IMAS.gacode_units.k
-    me = IMAS.gacode_units.me
+    lump_ions::Bool)
+
+    e = IMAS.gacode_units.e # statcoul
+    k = IMAS.gacode_units.k # erg/eV
+    mp = IMAS.gacode_units.mp # g
+    me = IMAS.gacode_units.me # g
+    md = 2 * mp # g
     m_to_cm = IMAS.gacode_units.m_to_cm
+    m³_to_cm³ = IMAS.gacode_units.m³_to_cm³
     T_to_Gauss = IMAS.gacode_units.T_to_Gauss
 
     eq1d = eqt.profiles_1d
 
     if lump_ions
         ions = IMAS.lump_ions_as_bulk_and_impurity(cp1d)
-        #ions = IMAS.broken_lump_ions_as_bulk_and_impurity(cp1d.ion, cp1d.grid.rho_tor_norm)
     else
         ions = cp1d.ion
     end
-    mi = ions[1].element[1].a * 1.6726e-24
+    mi = ions[1].element[1].a * mp
 
     Rmaj = IMAS.interp1d(eq1d.rho_tor_norm, m_to_cm * 0.5 * (eq1d.r_outboard .+ eq1d.r_inboard)).(cp1d.grid.rho_tor_norm)
 
@@ -471,7 +473,8 @@ function InputTGLF(
         delta = zero(cp1d.grid.rho_tor_norm)
     end
 
-    if !ismissing(eq1d, :squareness_lower_inner) && !ismissing(eq1d, :squareness_lower_outer) && !ismissing(eq1d, :squareness_upper_inner) && !ismissing(eq1d, :squareness_upper_outer)
+    if !ismissing(eq1d, :squareness_lower_inner) && !ismissing(eq1d, :squareness_lower_outer) && !ismissing(eq1d, :squareness_upper_inner) &&
+       !ismissing(eq1d, :squareness_upper_outer)
         tmp = 0.25 * (eq1d.squareness_lower_inner .+ eq1d.squareness_lower_outer .+ eq1d.squareness_upper_inner .+ eq1d.squareness_upper_outer)
         zeta = IMAS.interp1d(eq1d.rho_tor_norm, tmp).(cp1d.grid.rho_tor_norm)
     else
@@ -486,7 +489,7 @@ function InputTGLF(
     Te = Te[gridpoint_cp]
     dlntedr = dlntedr[gridpoint_cp]
 
-    ne = cp1d.electrons.density_thermal .* 1e-6
+    ne = cp1d.electrons.density_thermal ./ m³_to_cm³
     dlnnedr = -IMAS.calc_z(rmin, ne, :backward)
     ne = ne[gridpoint_cp]
     dlnnedr = dlnnedr[gridpoint_cp]
@@ -500,12 +503,13 @@ function InputTGLF(
     input_tglf.SIGN_BT = signb
     input_tglf.SIGN_IT = signb .* signq
 
-    input_tglf.NS = length(ions) + 1
+    input_tglf.NS = length(ions) + 1 # add 1 to include electrons
+
+    # electrons first for TGLF
     input_tglf.MASS_1 = me / mi
     input_tglf.TAUS_1 = 1.0
     input_tglf.AS_1 = 1.0
     input_tglf.ZS_1 = -1.0
-
     input_tglf.RLNS_1 = a .* dlnnedr
     input_tglf.RLTS_1 = a .* dlntedr
 
@@ -519,17 +523,20 @@ function InputTGLF(
     input_tglf.VPAR_SHEAR_1 = -input_tglf.SIGN_IT .* (a ./ c_s) .* gamma_p
     input_tglf.VEXB_SHEAR = -gamma_e .* (a ./ c_s)
 
+    m_norm = md
     for iion in eachindex(ions)
         species = iion + 1
-        setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a / ions[1].element[1].a)
-        setproperty!(input_tglf, Symbol("ZS_$species"), ions[iion].element[1].z_n / ions[1].element[1].z_n)
 
         Ti = ions[iion].temperature
         dlntidr = -IMAS.calc_z(rmin, Ti, :backward)
         Ti = Ti[gridpoint_cp]
         dlntidr = dlntidr[gridpoint_cp]
 
-        ni = ions[iion].density_thermal .* 1e-6
+        Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
+        setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
+        setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / m_norm)
+
+        ni = ions[iion].density_thermal ./ m³_to_cm³
         dlnnidr = -IMAS.calc_z(rmin, ni, :backward)
         ni = ni[gridpoint_cp]
         dlnnidr = dlnnidr[gridpoint_cp]
@@ -543,11 +550,11 @@ function InputTGLF(
     end
 
     input_tglf.BETAE = 8.0 * pi .* ne .* k .* Te ./ bunit .^ 2
-    loglam = 24.0 .- log.(sqrt.(ne) ./ (Te))
+    loglam = 24.0 .- log.(sqrt.(ne) ./ Te)
     input_tglf.XNUE = a ./ c_s * sqrt.(ions[1].element[1].a) .* e^4 .* pi .* ne .* loglam ./ (sqrt.(me) .* (k .* Te) .^ 1.5)
     input_tglf.ZEFF = cp1d.zeff[gridpoint_cp]
     rho_s = IMAS.rho_s(cp1d, eqt)[gridpoint_cp]
-    input_tglf.DEBYE = 7.43e2 * sqrt.(Te ./ (ne)) ./ rho_s
+    input_tglf.DEBYE = 7.43e2 * sqrt.(Te ./ ne) ./ rho_s
     input_tglf.RMIN_LOC = rmin[gridpoint_cp] ./ a
     input_tglf.RMAJ_LOC = Rmaj[gridpoint_cp] ./ a
     input_tglf.ZMAJ_LOC = 0
@@ -647,9 +654,11 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
 
     e = IMAS.gacode_units.e # statcoul
     k = IMAS.gacode_units.k # erg/eV
-    mp = IMAS.constants.m_p * 1e3 # g
-    me = IMAS.constants.m_e * 1e3
+    mp = IMAS.gacode_units.mp # g
+    me = IMAS.gacode_units.me # g
+    md = 2 * mp # g
     m_to_cm = IMAS.gacode_units.m_to_cm
+    m³_to_cm³ = IMAS.gacode_units.m³_to_cm³
     T_to_Gauss = IMAS.gacode_units.T_to_Gauss
 
     rmin = IMAS.r_min_core_profiles(cp1d, eqt)
@@ -660,7 +669,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     input_cgyro.RMIN = (rmin/a)[gridpoint_cp]
     input_cgyro.RMAJ = Rmaj[gridpoint_cp] / a
 
-    dens_e = cp1d.electrons.density ./ 1e6
+    dens_e = cp1d.electrons.density ./ m³_to_cm³
     ne = dens_e[gridpoint_cp]
     dlnnedr = -IMAS.calc_z(rmin ./ a, dens_e, :backward)
     dlnnedr = dlnnedr[gridpoint_cp]
@@ -671,42 +680,39 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     dlntedr = dlntedr[gridpoint_cp]
 
     n_norm = ne
-    m_norm = 3.3452e-27 * 1e3 # mass of deuterium in grams
+    m_norm = md
     t_norm = Te
-
     for iion in eachindex(ions)
         species = iion
-        setfield!(input_cgyro, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / m_norm)
-        setfield!(input_cgyro, Symbol("Z_$species"), ions[iion].element[1].z_n / ions[1].element[1].z_n)
 
         Ti = ions[iion].temperature ./ t_norm
         dlntidr = -IMAS.calc_z(rmin ./ a, Ti, :backward)
         Ti = Ti[gridpoint_cp]
         dlntidr = dlntidr[gridpoint_cp]
 
-        ni = ions[iion].density_thermal ./ 1e6 / n_norm
+        Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
+        setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
+        setproperty!(input_cgyro, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / m_norm)
+
+        ni = ions[iion].density_thermal ./ m³_to_cm³ / n_norm
         dlnnidr = -IMAS.calc_z(rmin ./ a, ni, :backward)
         ni = ni[gridpoint_cp]
         dlnnidr = dlnnidr[gridpoint_cp]
 
-        setfield!(input_cgyro, Symbol("TEMP_$species"), Ti)
-        setfield!(input_cgyro, Symbol("DENS_$species"), ni)
-        setfield!(input_cgyro, Symbol("DLNNDR_$species"), dlnnidr)
-        setfield!(input_cgyro, Symbol("DLNTDR_$species"), dlntidr)
+        setproperty!(input_cgyro, Symbol("TEMP_$species"), Ti)
+        setproperty!(input_cgyro, Symbol("DENS_$species"), ni)
+        setproperty!(input_cgyro, Symbol("DLNNDR_$species"), dlnnidr)
+        setproperty!(input_cgyro, Symbol("DLNTDR_$species"), dlntidr)
     end
 
-    for i in range(1, 11)
-        density_val = getfield(input_cgyro, Symbol("DENS_$i"))
-        if ismissing(density_val)
-            setfield!(input_cgyro, Symbol("DENS_$i"), ne / n_norm)
-            setfield!(input_cgyro, Symbol("TEMP_$i"), Te / t_norm)
-            setfield!(input_cgyro, Symbol("MASS_$i"), me / m_norm)
-            setfield!(input_cgyro, Symbol("Z_$i"), -1.0)
-            setfield!(input_cgyro, Symbol("DLNNDR_$i"), dlnnedr)
-            setfield!(input_cgyro, Symbol("DLNTDR_$i"), dlntedr)
-            break
-        end
-    end
+    # electrons last for CGYRO
+    i = length(ions) + 1
+    setproperty!(input_cgyro, Symbol("DENS_$i"), ne / n_norm)
+    setproperty!(input_cgyro, Symbol("TEMP_$i"), Te / t_norm)
+    setproperty!(input_cgyro, Symbol("MASS_$i"), me / m_norm)
+    setproperty!(input_cgyro, Symbol("Z_$i"), -1.0)
+    setproperty!(input_cgyro, Symbol("DLNNDR_$i"), dlnnedr)
+    setproperty!(input_cgyro, Symbol("DLNTDR_$i"), dlntedr)
 
     input_cgyro.N_SPECIES = length(ions) + 1 # add 1 to include electrons
 
