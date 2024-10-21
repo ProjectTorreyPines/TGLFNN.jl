@@ -453,7 +453,6 @@ function InputTGLF(
     else
         ions = cp1d.ion
     end
-    mi = ions[1].element[1].a * mp
 
     Rmaj = IMAS.interp1d(eq1d.rho_tor_norm, m_to_cm * 0.5 * (eq1d.r_outboard .+ eq1d.r_inboard)).(cp1d.grid.rho_tor_norm)
 
@@ -506,7 +505,7 @@ function InputTGLF(
     input_tglf.NS = length(ions) + 1 # add 1 to include electrons
 
     # electrons first for TGLF
-    input_tglf.MASS_1 = me / mi
+    input_tglf.MASS_1 = me / md
     input_tglf.TAUS_1 = 1.0
     input_tglf.AS_1 = 1.0
     input_tglf.ZS_1 = -1.0
@@ -523,7 +522,6 @@ function InputTGLF(
     input_tglf.VPAR_SHEAR_1 = -input_tglf.SIGN_IT .* (a ./ c_s) .* gamma_p
     input_tglf.VEXB_SHEAR = -gamma_e .* (a ./ c_s)
 
-    m_norm = md
     for iion in eachindex(ions)
         species = iion + 1
 
@@ -534,7 +532,7 @@ function InputTGLF(
 
         Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
         setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
-        setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / m_norm)
+        setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / md)
 
         ni = ions[iion].density_thermal ./ m³_to_cm³
         dlnnidr = -IMAS.calc_z(rmin, ni, :backward)
@@ -680,7 +678,6 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     dlntedr = dlntedr[gridpoint_cp]
 
     n_norm = ne
-    m_norm = md
     t_norm = Te
     for iion in eachindex(ions)
         species = iion
@@ -692,7 +689,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
 
         Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
         setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
-        setproperty!(input_cgyro, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / m_norm)
+        setproperty!(input_cgyro, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / md)
 
         ni = ions[iion].density_thermal ./ m³_to_cm³ / n_norm
         dlnnidr = -IMAS.calc_z(rmin ./ a, ni, :backward)
@@ -709,7 +706,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     i = length(ions) + 1
     setproperty!(input_cgyro, Symbol("DENS_$i"), ne / n_norm)
     setproperty!(input_cgyro, Symbol("TEMP_$i"), Te / t_norm)
-    setproperty!(input_cgyro, Symbol("MASS_$i"), me / m_norm)
+    setproperty!(input_cgyro, Symbol("MASS_$i"), me / md)
     setproperty!(input_cgyro, Symbol("Z_$i"), -1.0)
     setproperty!(input_cgyro, Symbol("DLNNDR_$i"), dlnnedr)
     setproperty!(input_cgyro, Symbol("DLNTDR_$i"), dlntedr)
