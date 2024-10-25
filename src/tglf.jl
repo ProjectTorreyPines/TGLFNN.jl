@@ -162,7 +162,7 @@ function Base.setproperty!(inputTGLFs::InputTGLFs, field::Symbol, value::Any)
 end
 
 function Base.getproperty(inputTGLFs::InputTGLFs, field::Symbol)
-    data = typeof(getfield(getfield(inputTGLFs, :tglfs)[1], field))[]
+    data = fieldtype(typeof(getfield(inputTGLFs, :tglfs)[1]), field)[]
     for inputTGLF in getfield(inputTGLFs, :tglfs)
         push!(data, getproperty(inputTGLF, field))
     end
