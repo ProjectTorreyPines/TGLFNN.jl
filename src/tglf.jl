@@ -682,8 +682,8 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
         Ti = Ti[gridpoint_cp]
         dlntidr = dlntidr[gridpoint_cp]
 
-        Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
-        setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
+        Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti*t_norm)
+        setproperty!(input_cgyro, Symbol("Z_$species"), Zi)
         setproperty!(input_cgyro, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / md)
 
         ni = ions[iion].density_thermal ./ m³_to_cm³ / n_norm
