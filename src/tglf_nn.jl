@@ -173,32 +173,23 @@ function flux_array(fluxmodel::TGLFNNmodel, x::AbstractMatrix; warn_nn_train_bou
     return hcat(collect(map(x0 -> flux_array(fluxmodel, x0; warn_nn_train_bounds), eachslice(x; dims=2)))...)
 end
 
-function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bounds::Bool=true, natrhonorm::Bool=false)
-    if eltype(x) <: Float32
-        x32 = copy(x)
-    else
-        x32 = Float32.(x)
-    end
-    for ix in findall(map(name -> contains(name, "_log10"), fluxmodel.xnames))
-        try
-            x32[ix] = Float32(log10.(x[ix]))
-        catch e
-            error("$(fluxmodel.xnames[ix]) has value $(x32[ix])")
-        end
-    end
+function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bounds::Bool=true)
+    xx = [contains(name, "_log10") ?  log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
     if warn_nn_train_bounds # training bounds are on the original data but after log10
-        for ix in eachindex(x32)
-            if any(x32[ix] .< fluxmodel.xbounds[ix, 1])
-                @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(minimum(x32[ix,:])) is below bound of $(fluxmodel.xbounds[ix,1])")
-            elseif any(x32[ix] .> fluxmodel.xbounds[ix, 2])
-                @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(maximum(x32[ix,:])) is above bound of $(fluxmodel.xbounds[ix,2])")
+        for ix in eachindex(xx)
+            if any(xx[ix] .< fluxmodel.xbounds[ix, 1])
+                @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(minimum(xx[ix,:])) is below bound of $(fluxmodel.xbounds[ix,1])")
+            elseif any(xx[ix] .> fluxmodel.xbounds[ix, 2])
+                @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(maximum(xx[ix,:])) is above bound of $(fluxmodel.xbounds[ix,2])")
             end
         end
     end
-    xn = (x32 .- fluxmodel.xm) ./ fluxmodel.xσ
-    yn = fluxmodel.fluxmodel(xn)
-    y = yn .* fluxmodel.yσ .+ fluxmodel.ym
-    return eltype(x).(y)
+    xn = (xx .- fluxmodel.xm) ./ fluxmodel.xσ
+    yn = Flux.fmap(Flux.f64, fluxmodel.fluxmodel)(xn)
+    yy = yn .* fluxmodel.yσ .+ fluxmodel.ym
+    error("(omx, omy) = ($xx, $yy)")
+    asdasda
+    return yy
 end
 
 function flux_array(fluxensemble::TGLFNNensemble, x::AbstractArray; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
@@ -206,7 +197,7 @@ function flux_array(fluxensemble::TGLFNNensemble, x::AbstractArray; uncertain::B
     nouts = length(fluxensemble.models[1].ynames)
     nsamples = size(x)[2]
 
-    tmp = zeros(Float32, nmodels, nouts, nsamples)
+    tmp = zeros(nmodels, nouts, nsamples)
     Threads.@threads for k in 1:length(fluxensemble.models)
         tmp[k, :, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds)
     end
@@ -223,7 +214,7 @@ function flux_array(fluxensemble::TGLFNNensemble, x::AbstractVector; uncertain::
     nmodels = length(fluxensemble.models)
     nouts = length(fluxensemble.models[1].ynames)
 
-    tmp = zeros(Float32, nmodels, nouts)
+    tmp = zeros(nmodels, nouts)
     Threads.@threads for k in 1:length(fluxensemble.models)
         tmp[k, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds)
     end
