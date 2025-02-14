@@ -1,3 +1,1 @@
-./sat0quench_em_ukstep_azf+1/committee.pt filter=lfs diff=lfs merge=lfs -text
-./sat1_em_ukstep_azf-1/committee.pt filter=lfs diff=lfs merge=lfs -text
-./sat2_em_ukstep_azf-1/committee.pt filter=lfs diff=lfs merge=lfs -text
+./*/committee.pt filter=lfs diff=lfs merge=lfs -text
