@@ -29,31 +29,6 @@ struct TGLFNNmodel <: TGLFmodel
     nions::Int
 end
 
-# constructor that always converts to the correct types
-function TGLFNNmodel(fluxmodel::Flux.Chain, name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
-    nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", xnames)))) - 1
-    return TGLFNNmodel(
-        Flux.fmap(Flux.f64, fluxmodel),
-        String(name),
-        date,
-        String.(xnames),
-        String.(ynames),
-        Float64.(reshape(xm, length(xm))),
-        Float64.(reshape(xσ, length(xσ))),
-        Float64.(reshape(ym, length(ym))),
-        Float64.(reshape(yσ, length(yσ))),
-        Float64.(xbounds),
-        Float64.(ybounds),
-        nions
-    )
-end
-
-# constructor where the date and ions is always filled out
-function TGLFNNmodel(fluxmodel::Flux.Chain, name, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
-    date = Dates.now()
-    return TGLFNNmodel(Flux.fmap(Flux.f64, fluxmodel), name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
-end
-
 function Base.show(io::IO, mime::MIME"text/plain", model::TGLFNNmodel)
     println(io, "TGLFNNmodel")
     println(io, "name: $(length(model.name))")
