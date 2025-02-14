@@ -20,12 +20,12 @@ struct TGLFNNmodel <: TGLFmodel
     date::Dates.DateTime
     xnames::Vector{String}
     ynames::Vector{String}
-    xm::Vector{Float32}
-    xσ::Vector{Float32}
-    ym::Vector{Float32}
-    yσ::Vector{Float32}
-    xbounds::Array{Float32}
-    ybounds::Array{Float32}
+    xm::Vector{Float64}
+    xσ::Vector{Float64}
+    ym::Vector{Float64}
+    yσ::Vector{Float64}
+    xbounds::Array{Float64}
+    ybounds::Array{Float64}
     nions::Int
 end
 
@@ -33,19 +33,25 @@ end
 function TGLFNNmodel(fluxmodel::Flux.Chain, name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
     nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", xnames)))) - 1
     return TGLFNNmodel(
-        fluxmodel,
+        Flux.fmap(Flux.f64, fluxmodel),
         String(name),
         date,
         String.(xnames),
         String.(ynames),
-        Float32.(reshape(xm, length(xm))),
-        Float32.(reshape(xσ, length(xσ))),
-        Float32.(reshape(ym, length(ym))),
-        Float32.(reshape(yσ, length(yσ))),
-        Float32.(xbounds),
-        Float32.(ybounds),
+        Float64.(reshape(xm, length(xm))),
+        Float64.(reshape(xσ, length(xσ))),
+        Float64.(reshape(ym, length(ym))),
+        Float64.(reshape(yσ, length(yσ))),
+        Float64.(xbounds),
+        Float64.(ybounds),
         nions
     )
+end
+
+# constructor where the date and ions is always filled out
+function TGLFNNmodel(fluxmodel::Flux.Chain, name, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
+    date = Dates.now()
+    return TGLFNNmodel(Flux.fmap(Flux.f64, fluxmodel), name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", model::TGLFNNmodel)
@@ -55,12 +61,6 @@ function Base.show(io::IO, mime::MIME"text/plain", model::TGLFNNmodel)
     println(io, "nions: $(model.nions)")
     println(io, "xnames ($(length(model.xnames))): $(model.xnames)")
     return println(io, "ynames ($(length(model.ynames))): $(model.ynames)")
-end
-
-# constructor where the date and ions is always filled out
-function TGLFNNmodel(fluxmodel::Flux.Chain, name, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
-    date = Dates.now()
-    return TGLFNNmodel(fluxmodel, name, date, xnames, ynames, xm, xσ, ym, yσ, xbounds, ybounds)
 end
 
 # TGLFNNensemble
@@ -125,14 +125,17 @@ Memoize.@memoize function loadmodelonce(filename::String)
     return loadmodel(filename)
 end
 
-function dict2mod(dict::AbstractDict)
+function dict2mod(savedict::AbstractDict)
     args = []
     for name in fieldnames(TGLFNNmodel)
-        if name == :nions
-            nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", dict[:xnames])))) - 1
+        if name == :fluxmodel
+            savedict[name] = Flux.fmap(Flux.f64, savedict[name])
+            push!(args, savedict[name])
+        elseif name == :nions
+            nions = maximum(map(m -> parse(Int, m[1]), filter(!isnothing, match.(r"_([0-9]+$)", savedict[:xnames])))) - 1
             push!(args, nions)
         else
-            push!(args, dict[name])
+            push!(args, savedict[name])
         end
     end
     return TGLFNNmodel(args...)
@@ -185,10 +188,8 @@ function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bou
         end
     end
     xn = (xx .- fluxmodel.xm) ./ fluxmodel.xσ
-    yn = Flux.fmap(Flux.f64, fluxmodel.fluxmodel)(xn)
+    yn = fluxmodel.fluxmodel(xn)
     yy = yn .* fluxmodel.yσ .+ fluxmodel.ym
-    error("(omx, omy) = ($xx, $yy)")
-    asdasda
     return yy
 end
 
