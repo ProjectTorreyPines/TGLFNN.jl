@@ -21,6 +21,10 @@ example_as_np = np.loadtxt('xm.txt')
 N_inputs = example_as_np.size
 example_input = torch.as_tensor(example_as_np.reshape(1,N_inputs),dtype=torch.float32) # Construct as (1,N_inputs) tensor.
 
+# Load scalings required to get result in standard TGLF units.
+model_ym = torch.from_numpy(np.loadtxt('ym.txt').astype(np.float32))
+model_ys = torch.from_numpy(np.loadtxt('ysigma.txt').astype(np.float32))
+
 pytorch_models = []  # List to store the converted PyTorch models
 
 for model_file_in in onnx_model_files:
@@ -43,7 +47,8 @@ class Committee(nn.Module):
 
     def forward(self, input):
         all_outputs = self.gather_models(input)
-        return torch.mean(all_outputs, dim=0), torch.var(all_outputs, dim=0)
+        # Scaled by ym and ys to obtain in TGLF units.
+        return model_ys * torch.mean(all_outputs, dim=0) + model_ym, model_ys **2 * torch.var(all_outputs, dim=0)
 
 committee = Committee(pytorch_models)
 
