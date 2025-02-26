@@ -12,6 +12,7 @@ IMASutils = "b8e4ee59-9bed-3a6a-a553-8dd24d6374ad"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
 Memoize = "c03570c3-d221-55d1-a50c-7939bbd78826"
 ONNXNaiveNASflux = "2e935253-ba83-4645-9154-13ffeb13a688"
+ONNXRunTime = "e034b28e-924e-41b2-b98f-d2bbeb830c6a"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
@@ -22,4 +23,5 @@ IMASutils = "1"
 Measurements = "2"
 Memoize = "0.4"
 ONNXNaiveNASflux = "0.2"
+ONNXRunTime = "1.3.1"
 StatsBase = "0.34"
