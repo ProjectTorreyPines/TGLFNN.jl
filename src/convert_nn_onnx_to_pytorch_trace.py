@@ -16,10 +16,14 @@ import os
 path = os.getcwd()
 onnx_model_files = [f for f in os.listdir(path) if f.endswith('.onnx')]
 
-# Load example input data used to trace models.
-example_as_np = np.loadtxt('xm.txt')
-N_inputs = example_as_np.size
-example_input = torch.as_tensor(example_as_np.reshape(1,N_inputs),dtype=torch.float32) # Construct as (1,N_inputs) tensor.
+# Load input mean, sd values
+xm       = np.loadtxt('xm.txt').astype(np.float32)
+model_xm = torch.from_numpy(xm)
+model_xs = torch.from_numpy(np.loadtxt('xsigma.txt').astype(np.float32))
+
+# Construct example input from mean
+N_inputs = xm.size
+example_input = torch.as_tensor(xm.reshape(1,N_inputs),dtype=torch.float32) # Construct as (1,N_inputs) tensor.
 
 # Load scalings required to get result in standard TGLF units.
 model_ym = torch.from_numpy(np.loadtxt('ym.txt').astype(np.float32))
@@ -46,8 +50,10 @@ class Committee(nn.Module):
         return torch.stack(outputs)  # Returns a tensor of shape (num_models, *output_shape)
 
     def forward(self, input):
-        all_outputs = self.gather_models(input)
-        # Scaled by ym and ys to obtain in TGLF units.
+        # Rescale the input.
+        scaled_input = (input - model_xm) / model_xs
+        all_outputs = self.gather_models(scaled_input)
+        # Output scaled by ym and ys to be equivalent to TGLF output.
         return model_ys * torch.mean(all_outputs, dim=0) + model_ym, model_ys **2 * torch.var(all_outputs, dim=0)
 
 committee = Committee(pytorch_models)
