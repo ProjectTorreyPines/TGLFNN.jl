@@ -1,0 +1,7 @@
+Semantic versioning is used to define an API version for when downstream users have to update interfaces 
+
+Thus version x.y.z of the network is like this
+
+  x - major version must be incremented if the NN inputs or outputs change, because this requires updates to downstream interfaces
+  y - minor version should be incremented if the TGLF settings are changed in the training set (e.g. SAT1 or SAT2).
+  z - patch version should be incremented if the training data / space, loss function, filters, or NN hyper-parameters are updated
