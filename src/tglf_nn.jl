@@ -6,6 +6,10 @@ import StatsBase
 import Measurements
 import BSON
 import ONNXNaiveNASflux
+import ONNXRunTime as ORT
+using ONNXRunTime.CAPI
+using ONNXRunTime: testdatapath
+
 
 #= ====================================== =#
 #  structs/constructors for the TGLFmodel
@@ -305,6 +309,96 @@ function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, w
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames))
 end
 
+function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)
+    # api = GetApi();
+    # sess_options = CreateSessionOptions(api)
+    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
+    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    if !contains("/models/", onnx_path)
+        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !isfile(onnx_path)
+            error("TGLFNN model does not exist in $onnx_path.")
+        end
+    end
+    path = ORT.testdatapath(onnx_path)
+    model = ORT.load_inference(path)
+    
+    tglfmod = model
+    inputs = zeros(length(xnames), length(input_tglfs))
+    for (i, input_tglf) in enumerate(input_tglfs)
+        for (k, item) in enumerate(xnames)
+            has_log10 = occursin("_log10", item)  # Check if the key contains "_log10"
+            item_clean = replace(item, "_log10" => "")
+    
+            if item_clean == "RLNS_12"
+                value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
+            else
+                value = getfield(input_tglf, Symbol(item_clean))
+            end
+    
+            if has_log10
+                value = log10(value)
+            end
+    
+            inputs[k, i] = value
+        end
+    end
+    tmp = model(Dict("input" => Float32.(inputs')))["output"]'
+    tmp_new = reduce(hcat, [tmp[1, :],tmp[4, :],tmp[2, :],tmp[3, :]])'
+    sol = [flux_solution(tmp_new[:, i]...) for i in eachindex(input_tglfs)]
+    return sol
+end
+
+
+function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)::Dict
+    # api = GetApi();
+    # sess_options = CreateSessionOptions(api)
+    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
+    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    if !contains("/models/", onnx_path)
+        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !isfile(onnx_path)
+            error("TGLFNN model does not exist in $onnx_path.")
+        end
+    end
+    path = ORT.testdatapath(onnx_path)
+    model = ORT.load_inference(path)
+    tglfmod = model
+    xnames_clean = [replace(name, "_log10" => "") for name in xnames]
+    x = Dict("input" => Float32.(collect(transpose(reduce(hcat, [Float64.(data[name]) for name in xnames_clean]))))')
+    y = tglfmod(x)["output"]'  # Ensure latest version runs
+    ynames_clean = [replace(name, "OUT_" => "") for name in ynames]
+    return Dict(name => y[k, :] for (k, name) in enumerate(ynames_clean))
+end
+
+function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)
+    # api = GetApi();
+    # sess_options = CreateSessionOptions(api)
+    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
+    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    if !contains("/models/", onnx_path)
+        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !isfile(onnx_path)
+            error("TGLFNN model does not exist in $onnx_path.")
+        end
+    end
+    path = ORT.testdatapath(onnx_path)
+    model = ORT.load_inference(path)
+    inputs = zeros(length(xnames))
+    for (k, item) in enumerate(xnames)
+        item = replace(item, "_log10" => "")
+        if item == "RLNS_12"
+            value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
+        else
+            value = getfield(input_tglf, Symbol(item))
+        end
+        inputs[k] = value
+    end
+    sol = model(Dict("input" => Float32.(inputs')))["output"]'
+    sol_new = [sol[1],sol[4],sol[2],sol[3]]
+    return sol_new
+end
+
 """
     flux_solution(xx::Vararg{T}) where {T<:Real}
 
@@ -351,4 +445,4 @@ function flux_solution(xx::Vararg{T}) where {T<:Real}
     return sol
 end
 
-export run_tglfnn
+export run_tglfnn, run_tglfnn_onnx
