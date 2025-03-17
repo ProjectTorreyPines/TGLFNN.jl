@@ -446,7 +446,7 @@ function InputTGLF(
     m³_to_cm³ = IMAS.cgs.m³_to_cm³
     T_to_Gauss = IMAS.cgs.T_to_Gauss
 
-    eq1d = eqt.profiles_1d
+    eqt1d = eqt.profiles_1d
 
     if lump_ions
         ions = IMAS.lump_ions_as_bulk_and_impurity(cp1d)
@@ -454,28 +454,28 @@ function InputTGLF(
         ions = cp1d.ion
     end
 
-    Rmaj = IMAS.interp1d(eq1d.rho_tor_norm, m_to_cm * 0.5 * (eq1d.r_outboard .+ eq1d.r_inboard)).(cp1d.grid.rho_tor_norm)
+    Rmaj = IMAS.interp1d(eqt1d.rho_tor_norm, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(cp1d.grid.rho_tor_norm)
 
     rmin = IMAS.r_min_core_profiles(cp1d, eqt)
 
-    q_profile = IMAS.interp1d(eq1d.rho_tor_norm, eq1d.q).(cp1d.grid.rho_tor_norm)
+    q_profile = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.q).(cp1d.grid.rho_tor_norm)
 
-    if !ismissing(eq1d, :elongation)
-        kappa = IMAS.interp1d(eq1d.rho_tor_norm, eq1d.elongation).(cp1d.grid.rho_tor_norm)
+    if !ismissing(eqt1d, :elongation)
+        kappa = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.elongation).(cp1d.grid.rho_tor_norm)
     else
         kappa = zero(cp1d.grid.rho_tor_norm)
     end
 
-    if !ismissing(eq1d, :triangularity_lower) && !ismissing(eq1d, :triangularity_upper)
-        delta = IMAS.interp1d(eq1d.rho_tor_norm, 0.5 * (eq1d.triangularity_lower + eq1d.triangularity_upper)).(cp1d.grid.rho_tor_norm)
+    if !ismissing(eqt1d, :triangularity_lower) && !ismissing(eqt1d, :triangularity_upper)
+        delta = IMAS.interp1d(eqt1d.rho_tor_norm, 0.5 * (eqt1d.triangularity_lower + eqt1d.triangularity_upper)).(cp1d.grid.rho_tor_norm)
     else
         delta = zero(cp1d.grid.rho_tor_norm)
     end
 
-    if !ismissing(eq1d, :squareness_lower_inner) && !ismissing(eq1d, :squareness_lower_outer) && !ismissing(eq1d, :squareness_upper_inner) &&
-       !ismissing(eq1d, :squareness_upper_outer)
-        tmp = 0.25 * (eq1d.squareness_lower_inner .+ eq1d.squareness_lower_outer .+ eq1d.squareness_upper_inner .+ eq1d.squareness_upper_outer)
-        zeta = IMAS.interp1d(eq1d.rho_tor_norm, tmp).(cp1d.grid.rho_tor_norm)
+    if !ismissing(eqt1d, :squareness_lower_inner) && !ismissing(eqt1d, :squareness_lower_outer) && !ismissing(eqt1d, :squareness_upper_inner) &&
+       !ismissing(eqt1d, :squareness_upper_outer)
+        tmp = 0.25 * (eqt1d.squareness_lower_inner .+ eqt1d.squareness_lower_outer .+ eqt1d.squareness_upper_inner .+ eqt1d.squareness_upper_outer)
+        zeta = IMAS.interp1d(eqt1d.rho_tor_norm, tmp).(cp1d.grid.rho_tor_norm)
     else
         zeta = zero(cp1d.grid.rho_tor_norm)
     end
@@ -494,7 +494,7 @@ function InputTGLF(
     dlnnedr = dlnnedr[gridpoint_cp]
 
     Bt = eqt.global_quantities.vacuum_toroidal_field.b0
-    bunit = IMAS.interp1d(eq1d.rho_tor_norm, IMAS.bunit(eqt) .* T_to_Gauss).(cp1d.grid.rho_tor_norm)[gridpoint_cp]
+    bunit = IMAS.interp1d(eqt1d.rho_tor_norm, IMAS.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm)[gridpoint_cp]
     input_tglf = InputTGLFs([TGLFNN.InputTGLF() for k in eachindex(gridpoint_cp)])
 
     signb = sign(Bt)
@@ -593,7 +593,7 @@ function InputTGLF(
     input_tglf.NMODES = input_tglf.NS .+ 2 # capture main branches: ES each species + BPER + VPAR_SHEAR
     input_tglf.NKY = 12 # 12 is default, 16 for smoother spectrum
     input_tglf.ALPHA_QUENCH = 0 # 0 = spectral shift, 1 = quench
-    input_tglf.SAT_RULE = parse(Int,split(string(sat),"sat")[end])
+    input_tglf.SAT_RULE = parse(Int, split(string(sat), "sat")[end])
     if sat == :sat2 || sat == :sat3
         input_tglf.UNITS = "CGYRO"
         input_tglf.KYGRID_MODEL = 4
@@ -636,7 +636,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
 
     eq = dd.equilibrium
     eqt = eq.time_slice[]
-    eq1d = eqt.profiles_1d
+    eqt1d = eqt.profiles_1d
     cp1d = dd.core_profiles.profiles_1d[]
 
     if lump_ions
@@ -657,7 +657,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     rmin = IMAS.r_min_core_profiles(cp1d, eqt)
     a = rmin[end]
 
-    Rmaj = IMAS.interp1d(eq1d.rho_tor_norm, m_to_cm * 0.5 * (eq1d.r_outboard .+ eq1d.r_inboard)).(cp1d.grid.rho_tor_norm)
+    Rmaj = IMAS.interp1d(eqt1d.rho_tor_norm, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(cp1d.grid.rho_tor_norm)
 
     input_cgyro.RMIN = (rmin/a)[gridpoint_cp]
     input_cgyro.RMAJ = Rmaj[gridpoint_cp] / a
@@ -682,7 +682,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
         Ti = Ti[gridpoint_cp]
         dlntidr = dlntidr[gridpoint_cp]
 
-        Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti*t_norm)
+        Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti * t_norm)
         setproperty!(input_cgyro, Symbol("Z_$species"), Zi)
         setproperty!(input_cgyro, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / md)
 
@@ -713,7 +713,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     nu_ee = (a / c_s) * (loglam * 4 * pi * ne * e^4) / ((2 * k * Te)^(3 / 2) * me^(1 / 2))
     input_cgyro.NU_EE = nu_ee
 
-    kappa = IMAS.interp1d(eq1d.rho_tor_norm, eq1d.elongation).(cp1d.grid.rho_tor_norm)
+    kappa = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.elongation).(cp1d.grid.rho_tor_norm)
     input_cgyro.KAPPA = kappa[gridpoint_cp]
 
     skappa = rmin .* IMAS.gradient(rmin, kappa) ./ kappa
@@ -722,26 +722,26 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     drmaj = IMAS.gradient(rmin, Rmaj)
     input_cgyro.SHIFT = drmaj[gridpoint_cp]
 
-    delta = IMAS.interp1d(eq1d.rho_tor_norm, 0.5 * (eq1d.triangularity_lower + eq1d.triangularity_upper)).(cp1d.grid.rho_tor_norm)
+    delta = IMAS.interp1d(eqt1d.rho_tor_norm, 0.5 * (eqt1d.triangularity_lower + eqt1d.triangularity_upper)).(cp1d.grid.rho_tor_norm)
     input_cgyro.DELTA = delta[gridpoint_cp]
     sdelta = rmin .* IMAS.gradient(rmin, delta)
     input_cgyro.S_DELTA = sdelta[gridpoint_cp]
 
     zeta =
         IMAS.interp1d(
-            eq1d.rho_tor_norm,
-            0.25 * (eq1d.squareness_lower_inner .+ eq1d.squareness_lower_outer .+ eq1d.squareness_upper_inner .+ eq1d.squareness_upper_outer)
+            eqt1d.rho_tor_norm,
+            0.25 * (eqt1d.squareness_lower_inner .+ eqt1d.squareness_lower_outer .+ eqt1d.squareness_upper_inner .+ eqt1d.squareness_upper_outer)
         ).(cp1d.grid.rho_tor_norm)
     input_cgyro.ZETA = zeta[gridpoint_cp]
     szeta = rmin .* IMAS.gradient(rmin, zeta)
     input_cgyro.S_ZETA = szeta[gridpoint_cp]
 
-    Z0 = IMAS.interp1d(eq1d.rho_tor_norm, eq1d.geometric_axis.z * 1e2).(cp1d.grid.rho_tor_norm)
+    Z0 = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.geometric_axis.z * 1e2).(cp1d.grid.rho_tor_norm)
     input_cgyro.ZMAG = Z0[gridpoint_cp] / a
     sZ0 = IMAS.gradient(rmin, Z0)
     input_cgyro.DZMAG = sZ0[gridpoint_cp]
 
-    q_profile = IMAS.interp1d(eq1d.rho_tor_norm, eq1d.q).(cp1d.grid.rho_tor_norm)
+    q_profile = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.q).(cp1d.grid.rho_tor_norm)
     q = q_profile[gridpoint_cp]
 
     input_cgyro.Q = q
@@ -755,7 +755,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     input_cgyro.GAMMA_E = (a / c_s) * gamma_e
     input_cgyro.MACH = mach
 
-    bunit = IMAS.interp1d(eq1d.rho_tor_norm, IMAS.bunit(eqt) .* T_to_Gauss).(cp1d.grid.rho_tor_norm)[gridpoint_cp]
+    bunit = IMAS.interp1d(eqt1d.rho_tor_norm, IMAS.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm[gridpoint_cp])
 
     input_cgyro.BETAE_UNIT = 8.0 * pi * ne * k * Te / bunit^2
 
@@ -815,7 +815,7 @@ end
 
 Run TGLF starting from a InputTGLF.
 
-Returns a `flux_solution` structure
+Returns a `FluxSolution` structure
 """
 function run_tglf(input_tglf::InputTGLF)
     folder = mktempdir()
@@ -852,7 +852,7 @@ function run_tglf(input_tglf::InputTGLF)
         rethrow(e)
     end
 
-    sol = IMAS.flux_solution(
+    sol = IMAS.FluxSolution(
         fluxes["Q/Q_GB_elec"],
         fluxes["Q/Q_GB_ions"],
         fluxes["Gam/Gam_GB_elec"],
@@ -871,7 +871,7 @@ Run TGLF starting from a vector of InputTGLFs.
 
 NOTE: Each run is done asyncronously (ie. in separate parallel processes)
 
-Returns a `flux_solution` structure
+Returns a `FluxSolution` structure
 """
 function run_tglf(input_tglfs::Vector{InputTGLF})
     return collect(asyncmap(input_tglf -> TGLFNN.run_tglf(input_tglf), input_tglfs))
@@ -970,7 +970,7 @@ end
 
 Run QLGYRO starting from a InputQLGYRO and InputCGYRO
 
-Returns a `flux_solution` structure
+Returns a `FluxSolution` structure
 """
 function run_qlgyro(input_qlgyro::InputQLGYRO, input_cgyro::InputCGYRO)
     folder = mktempdir()
@@ -1004,7 +1004,7 @@ function run_qlgyro(input_qlgyro::InputQLGYRO, input_cgyro::InputCGYRO)
         rethrow(e)
     end
 
-    sol = IMAS.flux_solution(
+    sol = IMAS.FluxSolution(
         fluxes["Q/Q_GB_elec"],
         fluxes["Q/Q_GB_ions"],
         fluxes["Gam/Gam_GB_elec"],
@@ -1023,7 +1023,7 @@ Run QLGYRO starting from a vectors of InputQLGYRO and InputCGYRO
 
 NOTE: Each run is done sequentially, one after the other
 
-Returns a vector of `flux_solution` structures
+Returns a vector of `FluxSolution` structures
 """
 function run_qlgyro(input_qlgyros::Vector{InputQLGYRO}, input_cgyros::Vector{InputCGYRO})
     @assert length(input_qlgyros) == length(input_cgyros)

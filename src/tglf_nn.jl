@@ -339,14 +339,14 @@ function flux_solution(xx::Vararg{T}) where {T<:Real}
         ENERGY_FLUX_i = 4
         PARTICLE_FLUX_e = 1
         STRESS_TOR_i = 2
-        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
+        sol = IMAS.FluxSolution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
     else
         ENERGY_FLUX_e = n_fields - 1
         ENERGY_FLUX_i = n_fields
         PARTICLE_FLUX_e = 1
         PARTICLE_FLUX_i = 2:n_fields-3
         STRESS_TOR_i = n_fields - 2
-        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
+        sol = IMAS.FluxSolution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
     end
     return sol
 end
