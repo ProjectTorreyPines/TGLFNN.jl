@@ -314,6 +314,12 @@ function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnam
     # sess_options = CreateSessionOptions(api)
     # sess_options.intra_op_num_threads = 2  # Adjust based on your system
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    if !contains("/models/", onnx_path)
+        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !isfile(onnx_path)
+            error("TGLFNN model does not exist in $onnx_path.")
+        end
+    end
     path = ORT.testdatapath(onnx_path)
     model = ORT.load_inference(path)
     
@@ -349,6 +355,12 @@ function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, 
     # sess_options = CreateSessionOptions(api)
     # sess_options.intra_op_num_threads = 2  # Adjust based on your system
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    if !contains("/models/", onnx_path)
+        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !isfile(onnx_path)
+            error("TGLFNN model does not exist in $onnx_path.")
+        end
+    end
     path = ORT.testdatapath(onnx_path)
     model = ORT.load_inference(path)
     tglfmod = model
@@ -364,6 +376,12 @@ function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vecto
     # sess_options = CreateSessionOptions(api)
     # sess_options.intra_op_num_threads = 2  # Adjust based on your system
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    if !contains("/models/", onnx_path)
+        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !isfile(onnx_path)
+            error("TGLFNN model does not exist in $onnx_path.")
+        end
+    end
     path = ORT.testdatapath(onnx_path)
     model = ORT.load_inference(path)
     inputs = zeros(length(xnames))
