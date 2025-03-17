@@ -145,7 +145,8 @@ function loadmodel(filename::AbstractString)
 end
 
 function available_models()
-    return [replace(model, ".bson"=>"") for model in readdir(dirname(@__DIR__) * "/models/") if endswith(model,".bson")]
+    models_dir = joinpath(dirname(@__DIR__), "models")
+    return [replace(model, r"\.(bson|onnx)$" => "") for model in readdir(models_dir) if endswith(model, ".bson") || endswith(model, ".onnx")]
 end
 
 #= ==================================== =#
@@ -316,8 +317,11 @@ function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnam
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
     if !contains("/models/", onnx_path)
         onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !endswith(onnx_path, ".onnx")
+            onnx_path = "$(onnx_path).onnx"
+        end
         if !isfile(onnx_path)
-            error("TGLFNN model does not exist in $onnx_path.")
+            error("TGLFNN model does not exist in $onnx_path")
         end
     end
     path = ORT.testdatapath(onnx_path)
@@ -357,8 +361,11 @@ function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, 
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
     if !contains("/models/", onnx_path)
         onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !endswith(onnx_path, ".onnx")
+            onnx_path = "$(onnx_path).onnx"
+        end
         if !isfile(onnx_path)
-            error("TGLFNN model does not exist in $onnx_path.")
+            error("TGLFNN model does not exist in $onnx_path")
         end
     end
     path = ORT.testdatapath(onnx_path)
@@ -378,8 +385,11 @@ function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vecto
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
     if !contains("/models/", onnx_path)
         onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+        if !endswith(onnx_path, ".onnx")
+            onnx_path = "$(onnx_path).onnx"
+        end
         if !isfile(onnx_path)
-            error("TGLFNN model does not exist in $onnx_path.")
+            error("TGLFNN model does not exist in $onnx_path")
         end
     end
     path = ORT.testdatapath(onnx_path)
