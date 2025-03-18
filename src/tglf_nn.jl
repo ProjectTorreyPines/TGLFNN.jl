@@ -310,102 +310,59 @@ function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, w
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames))
 end
 
-function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)
-    # api = GetApi();
-    # sess_options = CreateSessionOptions(api)
-    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
-    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
-    if !contains("/models/", onnx_path)
-        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
+function load_onnx_model(onnx_path::String)
+    if !contains(onnx_path, "/models/")
+        onnx_path = joinpath(dirname(@__DIR__), "models", onnx_path)
         if !endswith(onnx_path, ".onnx")
-            onnx_path = "$(onnx_path).onnx"
+            onnx_path *= ".onnx"
         end
         if !isfile(onnx_path)
             error("TGLFNN model does not exist in $onnx_path")
         end
     end
-    path = ORT.testdatapath(onnx_path)
-    model = ORT.load_inference(path)
-    
-    tglfmod = model
-    inputs = zeros(length(xnames), length(input_tglfs))
-    for (i, input_tglf) in enumerate(input_tglfs)
-        for (k, item) in enumerate(xnames)
-            has_log10 = occursin("_log10", item)  # Check if the key contains "_log10"
-            item_clean = replace(item, "_log10" => "")
-    
-            if item_clean == "RLNS_12"
-                value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
-            else
-                value = getfield(input_tglf, Symbol(item_clean))
-            end
-    
-            if has_log10
-                value = log10(value)
-            end
-    
-            inputs[k, i] = value
-        end
-    end
+    return ORT.load_inference(ORT.testdatapath(onnx_path))
+end
+
+function build_input_value(input_tglf::InputTGLF, name::String)
+    key = replace(name, "_log10" => "")
+    value = key == "RLNS_12" ? sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2) :
+                                getfield(input_tglf, Symbol(key))
+    return occursin("_log10", name) ? log10(value) : value
+end
+
+function build_inputs(input_tglfs::Vector{InputTGLF}, xnames::Vector{String})
+    return hcat([ [ build_input_value(t, x) for x in xnames ] for t in input_tglfs ]...)
+end
+
+# Reorder output rows to match a new order, e.g. [1, 4, 2, 3]
+function reorder_output(out::AbstractMatrix, order::Vector{Int})
+    return reduce(hcat, [out[i, :] for i in order])'
+end
+
+function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})
+    model = load_onnx_model(onnx_path)
+    inputs = build_inputs(input_tglfs, xnames)
     tmp = model(Dict("input" => Float32.(inputs')))["output"]'
-    tmp_new = reduce(hcat, [tmp[1, :],tmp[4, :],tmp[2, :],tmp[3, :]])'
-    sol = [flux_solution(tmp_new[:, i]...) for i in eachindex(input_tglfs)]
+    tmp_new = reorder_output(tmp, [1, 4, 2, 3])
+    sol = [flux_solution(tmp_new[:, i]...) for i in 1:size(tmp_new, 2)]
     return sol
 end
 
-
-function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)::Dict
-    # api = GetApi();
-    # sess_options = CreateSessionOptions(api)
-    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
-    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
-    if !contains("/models/", onnx_path)
-        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
-        if !endswith(onnx_path, ".onnx")
-            onnx_path = "$(onnx_path).onnx"
-        end
-        if !isfile(onnx_path)
-            error("TGLFNN model does not exist in $onnx_path")
-        end
-    end
-    path = ORT.testdatapath(onnx_path)
-    model = ORT.load_inference(path)
-    tglfmod = model
+function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})::Dict
+    model = load_onnx_model(onnx_path)
     xnames_clean = [replace(name, "_log10" => "") for name in xnames]
-    x = Dict("input" => Float32.(collect(transpose(reduce(hcat, [Float64.(data[name]) for name in xnames_clean]))))')
-    y = tglfmod(x)["output"]'  # Ensure latest version runs
+    x = reduce(hcat, [Float64.(data[name]) for name in xnames_clean])
+    x = Float32.(x')
+    y = model(Dict("input" => x))["output"]'
     ynames_clean = [replace(name, "OUT_" => "") for name in ynames]
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames_clean))
 end
 
-function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)
-    # api = GetApi();
-    # sess_options = CreateSessionOptions(api)
-    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
-    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
-    if !contains("/models/", onnx_path)
-        onnx_path = dirname(@__DIR__) * "/models/" * onnx_path
-        if !endswith(onnx_path, ".onnx")
-            onnx_path = "$(onnx_path).onnx"
-        end
-        if !isfile(onnx_path)
-            error("TGLFNN model does not exist in $onnx_path")
-        end
-    end
-    path = ORT.testdatapath(onnx_path)
-    model = ORT.load_inference(path)
-    inputs = zeros(length(xnames))
-    for (k, item) in enumerate(xnames)
-        item = replace(item, "_log10" => "")
-        if item == "RLNS_12"
-            value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
-        else
-            value = getfield(input_tglf, Symbol(item))
-        end
-        inputs[k] = value
-    end
-    sol = model(Dict("input" => Float32.(inputs')))["output"]'
-    sol_new = [sol[1],sol[4],sol[2],sol[3]]
+function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})
+    model = load_onnx_model(onnx_path)
+    values = [build_input_value(input_tglf, x) for x in xnames]
+    sol = model(Dict("input" => Float32.([values]')))["output"]'
+    sol_new = [sol[1], sol[4], sol[2], sol[3]]
     return sol_new
 end
 
