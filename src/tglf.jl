@@ -456,7 +456,7 @@ function InputTGLF(
 
     Rmaj = IMAS.interp1d(eqt1d.rho_tor_norm, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(cp1d.grid.rho_tor_norm)
 
-    rmin = IMAS.r_min_core_profiles(cp1d, eqt)
+    rmin = IMAS.r_min_core_profiles(eqt1d, cp1d.grid.rho_tor_norm)
 
     q_profile = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.q).(cp1d.grid.rho_tor_norm)
 
@@ -654,7 +654,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     m³_to_cm³ = IMAS.cgs.m³_to_cm³
     T_to_Gauss = IMAS.cgs.T_to_Gauss
 
-    rmin = IMAS.r_min_core_profiles(cp1d, eqt)
+    rmin = IMAS.r_min_core_profiles(eqt1d, cp1d.grid.rho_tor_norm)
     a = rmin[end]
 
     Rmaj = IMAS.interp1d(eqt1d.rho_tor_norm, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(cp1d.grid.rho_tor_norm)
