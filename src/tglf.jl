@@ -1,5 +1,3 @@
-using IMAS
-
 Base.@kwdef mutable struct InputTGLF
     SIGN_BT::Union{Int,Missing} = missing
     SIGN_IT::Union{Int,Missing} = missing
@@ -456,7 +454,7 @@ function InputTGLF(
 
     Rmaj = IMAS.interp1d(eqt1d.rho_tor_norm, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(cp1d.grid.rho_tor_norm)
 
-    rmin = IMAS.r_min_core_profiles(eqt1d, cp1d.grid.rho_tor_norm)
+    rmin = GACODE.r_min_core_profiles(eqt1d, cp1d.grid.rho_tor_norm)
 
     q_profile = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.q).(cp1d.grid.rho_tor_norm)
 
@@ -512,7 +510,7 @@ function InputTGLF(
     input_tglf.RLNS_1 = a .* dlnnedr
     input_tglf.RLTS_1 = a .* dlntedr
 
-    c_s = IMAS.c_s(cp1d)[gridpoint_cp]
+    c_s = GACODE.c_s(cp1d)[gridpoint_cp]
     w0 = -1 * cp1d.rotation_frequency_tor_sonic
     w0p = IMAS.gradient(rmin, w0)
     gamma_p = -Rmaj[gridpoint_cp] .* w0p[gridpoint_cp]
@@ -551,7 +549,7 @@ function InputTGLF(
     loglam = 24.0 .- log.(sqrt.(ne) ./ Te)
     input_tglf.XNUE = a ./ c_s * sqrt.(ions[1].element[1].a) .* e^4 .* pi .* ne .* loglam ./ (sqrt.(me) .* (k .* Te) .^ 1.5)
     input_tglf.ZEFF = cp1d.zeff[gridpoint_cp]
-    rho_s = IMAS.rho_s(cp1d, eqt)[gridpoint_cp]
+    rho_s = GACODE.rho_s(cp1d, eqt)[gridpoint_cp]
     input_tglf.DEBYE = 7.43e2 * sqrt.(Te ./ ne) ./ rho_s
     input_tglf.RMIN_LOC = rmin[gridpoint_cp] ./ a
     input_tglf.RMAJ_LOC = Rmaj[gridpoint_cp] ./ a
@@ -654,7 +652,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     m³_to_cm³ = IMAS.cgs.m³_to_cm³
     T_to_Gauss = IMAS.cgs.T_to_Gauss
 
-    rmin = IMAS.r_min_core_profiles(eqt1d, cp1d.grid.rho_tor_norm)
+    rmin = GACODE.r_min_core_profiles(eqt1d, cp1d.grid.rho_tor_norm)
     a = rmin[end]
 
     Rmaj = IMAS.interp1d(eqt1d.rho_tor_norm, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(cp1d.grid.rho_tor_norm)
@@ -708,7 +706,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
 
     input_cgyro.N_SPECIES = length(ions) + 1 # add 1 to include electrons
 
-    c_s = IMAS.c_s(cp1d)[gridpoint_cp]
+    c_s = GACODE.c_s(cp1d)[gridpoint_cp]
     loglam = 24.0 - log(sqrt(ne) / (Te))
     nu_ee = (a / c_s) * (loglam * 4 * pi * ne * e^4) / ((2 * k * Te)^(3 / 2) * me^(1 / 2))
     input_cgyro.NU_EE = nu_ee
@@ -852,7 +850,7 @@ function run_tglf(input_tglf::InputTGLF)
         rethrow(e)
     end
 
-    sol = IMAS.FluxSolution(
+    sol = GACODE.FluxSolution(
         fluxes["Q/Q_GB_elec"],
         fluxes["Q/Q_GB_ions"],
         fluxes["Gam/Gam_GB_elec"],
@@ -1004,7 +1002,7 @@ function run_qlgyro(input_qlgyro::InputQLGYRO, input_cgyro::InputCGYRO)
         rethrow(e)
     end
 
-    sol = IMAS.FluxSolution(
+    sol = GACODE.FluxSolution(
         fluxes["Q/Q_GB_elec"],
         fluxes["Q/Q_GB_ions"],
         fluxes["Gam/Gam_GB_elec"],
