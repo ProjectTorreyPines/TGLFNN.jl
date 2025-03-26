@@ -492,7 +492,7 @@ function InputTGLF(
     dlnnedr = dlnnedr[gridpoint_cp]
 
     Bt = eqt.global_quantities.vacuum_toroidal_field.b0
-    bunit = IMAS.interp1d(eqt1d.rho_tor_norm, IMAS.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm)[gridpoint_cp]
+    bunit = IMAS.interp1d(eqt1d.rho_tor_norm, GACODE.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm)[gridpoint_cp]
     input_tglf = InputTGLFs([TGLFNN.InputTGLF() for k in eachindex(gridpoint_cp)])
 
     signb = sign(Bt)
@@ -753,7 +753,7 @@ function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
     input_cgyro.GAMMA_E = (a / c_s) * gamma_e
     input_cgyro.MACH = mach
 
-    bunit = IMAS.interp1d(eqt1d.rho_tor_norm, IMAS.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm[gridpoint_cp])
+    bunit = IMAS.interp1d(eqt1d.rho_tor_norm, GACODE.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm[gridpoint_cp])
 
     input_cgyro.BETAE_UNIT = 8.0 * pi * ne * k * Te / bunit^2
 
