@@ -1,5 +1,8 @@
 module TGLFNN
 
+using IMAS
+import GACODE
+
 include("tglf.jl")
 
 include("tglf_nn.jl")

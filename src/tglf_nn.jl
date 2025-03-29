@@ -157,7 +157,7 @@ function flux_array(fluxmodel::TGLFNNmodel, x::AbstractMatrix; warn_nn_train_bou
 end
 
 function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bounds::Bool=true)
-    xx = [contains(name, "_log10") ?  log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
+    xx = [contains(name, "_log10") ? log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
     if warn_nn_train_bounds # training bounds are on the original data but after log10
         for ix in eachindex(xx)
             if any(xx[ix] .< fluxmodel.xbounds[ix, 1])
@@ -325,13 +325,12 @@ end
 
 function build_input_value(input_tglf::InputTGLF, name::String)
     key = replace(name, "_log10" => "")
-    value = key == "RLNS_12" ? sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2) :
-                                getfield(input_tglf, Symbol(key))
+    value = key == "RLNS_12" ? sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2) : getfield(input_tglf, Symbol(key))
     return occursin("_log10", name) ? log10(value) : value
 end
 
 function build_inputs(input_tglfs::Vector{InputTGLF}, xnames::Vector{String})
-    return hcat([ [ build_input_value(t, x) for x in xnames ] for t in input_tglfs ]...)
+    return hcat([[build_input_value(t, x) for x in xnames] for t in input_tglfs]...)
 end
 
 # Reorder output rows to match a new order, e.g. [1, 4, 2, 3]
@@ -400,14 +399,14 @@ function flux_solution(xx::Vararg{T}) where {T<:Real}
         ENERGY_FLUX_i = 4
         PARTICLE_FLUX_e = 1
         STRESS_TOR_i = 2
-        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
+        sol = GACODE.FluxSolution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
     else
         ENERGY_FLUX_e = n_fields - 1
         ENERGY_FLUX_i = n_fields
         PARTICLE_FLUX_e = 1
         PARTICLE_FLUX_i = 2:n_fields-3
         STRESS_TOR_i = n_fields - 2
-        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
+        sol = GACODE.FluxSolution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
     end
     return sol
 end
