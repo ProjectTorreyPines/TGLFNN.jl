@@ -1,6 +1,6 @@
 # TGLFNN.jl
 
-Run TGLF-NN, GKNN, TJLF, TGLF, and QLGYRO models. 
+Run TGLF-NN, GKNN, TGLF, and QLGYRO models. 
 
 For a tutorial on how to run these models, see the [FUSE flux-matcher tutorial](https://github.com/ProjectTorreyPines/FuseExamples/blob/master/fluxmatcher.ipynb).
 
