@@ -619,7 +619,7 @@ function InputTGLF(
     # electrostatic/electromagnetic
     if electromagnetic
         input_tglf.USE_BPER = true
-        input_tglf.USE_BPAR = false # TGLF does not have enough moments to resolve BPAR flutter
+        input_tglf.USE_BPAR = true
     else
         input_tglf.USE_BPER = false
         input_tglf.USE_BPAR = false
