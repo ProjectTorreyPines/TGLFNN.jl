@@ -134,6 +134,9 @@ Base.@kwdef mutable struct InputTGLF
     USE_BPAR::Union{Bool,Missing} = missing
     USE_BPER::Union{Bool,Missing} = missing
 
+    #For Onnx Spectrum Models
+    KY_SPECTRUM_ONNX::Union{Vector{Float64},Missing} = missing
+
     # other
     THETA_TRAPPED::Float64 = 0.7
 

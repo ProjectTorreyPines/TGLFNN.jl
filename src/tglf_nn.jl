@@ -373,6 +373,14 @@ function build_input_value(input_tglf::InputTGLF, name::String)
     return occursin("_log10", name) ? log10(value) : value
 end
 
+function build_spectra(input_tglfs::Vector{InputTGLF})
+    spectra_inputs = zeros(24, length(input_tglfs))
+    for (i, input_tglf) in enumerate(input_tglfs):
+        spectra_inputs[:, i] = input_tglf.KY_SPECTRUM_ONNX
+    end
+    return spectra_inputs
+end
+
 function build_inputs(input_tglfs::Vector{InputTGLF}, xnames::Vector{String})
     return hcat([[build_input_value(t, x) for x in xnames] for t in input_tglfs]...)
 end
@@ -382,29 +390,44 @@ function reorder_output(out::AbstractMatrix, order::Vector{Int})
     return reduce(hcat, [out[i, :] for i in order])'
 end
 
-function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})
+function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnames::Vector{String}, ynames::Vector{String}, use_spectra::Bool=false)
     model = load_onnx_model(onnx_path)
     inputs = build_inputs(input_tglfs, xnames)
-    tmp = model(Dict("input" => Float32.(inputs')))["output"]'
+    if use_spectra
+        spectra = build_spectra(input_tglfs)
+        tmp = model(Dict("input" => Float32.(inputs'), "spectra" => Float32.(spectra_inputs')))["output"]'
+    else
+        tmp = model(Dict("input" => Float32.(inputs')))["output"]'
+    end
     tmp_new = reorder_output(tmp, [1, 4, 2, 3])
     sol = [flux_solution(tmp_new[:, i]...) for i in 1:size(tmp_new, 2)]
     return sol
 end
 
-function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})::Dict
+function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, ynames::Vector{String}, use_spectra::Bool=false)::Dict
     model = load_onnx_model(onnx_path)
     xnames_clean = [replace(name, "_log10" => "") for name in xnames]
     x = reduce(hcat, [Float64.(data[name]) for name in xnames_clean])
     x = Float32.(x')
-    y = model(Dict("input" => x))["output"]'
+    if use_spectra
+        spectra_input = input_tglf.KY_SPECTRUM_ONNX
+        y = model(Dict("input" => x, "spectra" => Float32.(spectra_input')))["output"]'
+    else
+        y = model(Dict("input" => x))["output"]'
+    end
     ynames_clean = [replace(name, "OUT_" => "") for name in ynames]
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames_clean))
 end
 
-function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})
+function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vector{String}, ynames::Vector{String}, use_spectra::Bool=false)
     model = load_onnx_model(onnx_path)
     values = [build_input_value(input_tglf, x) for x in xnames]
-    sol = model(Dict("input" => Float32.([values]')))["output"]'
+    if use_spectra
+        spectra_input = input_tglf.KY_SPECTRUM_ONNX
+        tmp = model(Dict("input" => Float32.([values]'), "spectra" => Float32.([spectra_input]')))["output"]'
+    else
+        tmp = model(Dict("input" => Float32.([values]')))["output"]'
+    end
     sol_new = [sol[1], sol[4], sol[2], sol[3]]
     return sol_new
 end
