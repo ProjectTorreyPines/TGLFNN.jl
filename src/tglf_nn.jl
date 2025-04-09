@@ -267,7 +267,7 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
         sol[1] .*= err_g
         gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp1")
         err_p = gknnp(vcat(inputs, sol[2])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
-        sol[2] .*= err_p
+        sol[2] .*= -err_p
         gknne = TGLFNN.loadmodelonce(model_filename * "_gknne1")
         err_e = gknne(vcat(inputs, sol[3])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         sol[3] .*= err_e
@@ -308,7 +308,7 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
         tmp[1, :] .*= err_g[1, :]
         gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp1")
         err_p = flux_array(gknnp, vcat(inputs, reshape(tmp[2, :], 1, :)); uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
-        tmp[2, :] .*= err_p[1, :]
+        tmp[2, :] .*= -err_p[1, :]
         gknne = TGLFNN.loadmodelonce(model_filename * "_gknne1")
         err_e = flux_array(gknne, vcat(inputs, reshape(tmp[3, :], 1, :)); uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         tmp[3, :] .*= err_e[1, :]
@@ -342,7 +342,7 @@ function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, w
         y[1] .*= err_g
         gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp1")
         err_p = gknnp(vcat(x, y[2])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
-        y[2] .*= err_p
+        y[2] .*= -err_p
         gknne = TGLFNN.loadmodelonce(model_filename * "_gknne1")
         err_e = gknne(vcat(x, y[3])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         y[3] .*= err_e
