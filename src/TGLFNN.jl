@@ -1,6 +1,7 @@
 module TGLFNN
 
 using IMAS
+using IMASutils: argmin_abs
 import GACODE
 
 include("tglf.jl")

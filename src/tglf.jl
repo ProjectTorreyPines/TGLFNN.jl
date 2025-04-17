@@ -396,7 +396,7 @@ function scan(input_tglf::InputTGLF; kw...)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", input_tglf::InputTGLF)
-    for fname in sort(collect(fieldnames(typeof(input_tglf))))
+    for fname in sort!(collect(fieldnames(typeof(input_tglf))))
         value = getfield(input_tglf, fname)
         if value !== missing && (!isdigit(string(fname)[end]) || (isdigit(string(fname)[end]) && parse(Int, split(string(fname), "_")[end]) <= input_tglf.NS))
             println(io, "$fname = $(value)")
@@ -412,7 +412,7 @@ Evaluate TGLF input parameters at given radii
 function InputTGLF(dd::IMAS.dd, rho::AbstractVector{Float64}, sat::Symbol=:sat0, electromagnetic::Bool=false, lump_ions::Bool=true)
     eqt = dd.equilibrium.time_slice[]
     cp1d = dd.core_profiles.profiles_1d[]
-    gridpoint_cp = [argmin(abs.(cp1d.grid.rho_tor_norm .- ρ)) for ρ in rho]
+    gridpoint_cp = [argmin_abs(cp1d.grid.rho_tor_norm, ρ) for ρ in rho]
     return InputTGLF(eqt, cp1d, gridpoint_cp, sat, electromagnetic, lump_ions)
 end
 
