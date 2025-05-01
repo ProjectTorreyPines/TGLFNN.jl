@@ -254,7 +254,7 @@ Returns a `flux_solution` structure
 """
 function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
     if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
-	tglfmod = loadmodelonce(model_filename * "_tglfnn24")
+	    tglfmod = loadmodelonce(model_filename * "_tglfnn24")
     else
         tglfmod = loadmodelonce(model_filename)
     end
@@ -266,16 +266,16 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
     end
     sol = tglfmod(inputs...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = :TGLFNN)
     if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
-        gknng = TGLFNN.loadmodelonce(model_filename * "_gknng23")
+        gknng = TGLFNN.loadmodelonce(model_filename * "_gknng24")
         err_g = gknng(vcat(inputs, sol[1])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         sol[1] .*= err_g
-        gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp23")
+        gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp24")
         err_p = gknnp(vcat(inputs, sol[2])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         sol[2] .*= err_p
-        gknne = TGLFNN.loadmodelonce(model_filename * "_gknne23")
+        gknne = TGLFNN.loadmodelonce(model_filename * "_gknne24")
         err_e = gknne(vcat(inputs, sol[3])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         sol[3] .*= err_e
-        gknni = TGLFNN.loadmodelonce(model_filename * "_gknni23")
+        gknni = TGLFNN.loadmodelonce(model_filename * "_gknni24")
         err_i = gknni(vcat(inputs, sol[4])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         sol[4] .*= err_i
     end
@@ -297,7 +297,7 @@ Returns a vector of `flux_solution` structures
 """
 function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
     if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
-	tglfmod = loadmodelonce(model_filename * "_tglfnn24")
+	    tglfmod = loadmodelonce(model_filename * "_tglfnn24")
     else
         tglfmod = loadmodelonce(model_filename)
     end
@@ -311,16 +311,16 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
     end
     tmp = flux_array(tglfmod, inputs; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = :TGLFNN)
     if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
-        gknng = TGLFNN.loadmodelonce(model_filename * "_gknng23")
+        gknng = TGLFNN.loadmodelonce(model_filename * "_gknng24")
         err_g = flux_array(gknng, vcat(inputs, reshape(tmp[1, :], 1, :)); uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         tmp[1, :] .*= err_g[1, :]
-        gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp23")
+        gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp24")
         err_p = flux_array(gknnp, vcat(inputs, reshape(tmp[2, :], 1, :)); uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         tmp[2, :] .*= err_p[1, :]
-        gknne = TGLFNN.loadmodelonce(model_filename * "_gknne23")
+        gknne = TGLFNN.loadmodelonce(model_filename * "_gknne24")
         err_e = flux_array(gknne, vcat(inputs, reshape(tmp[3, :], 1, :)); uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         tmp[3, :] .*= err_e[1, :]
-        gknni = TGLFNN.loadmodelonce(model_filename * "_gknni23")
+        gknni = TGLFNN.loadmodelonce(model_filename * "_gknni24")
         err_i = flux_array(gknni, vcat(inputs, reshape(tmp[4, :], 1, :)); uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         tmp[4, :] .*= err_i[1, :]
     end
@@ -341,7 +341,7 @@ Returns a dictionary with fluxes
 """
 function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)::Dict
     if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
-	tglfmod = loadmodelonce(model_filename * "_tglfnn24")
+	    tglfmod = loadmodelonce(model_filename * "_tglfnn24")
     else
         tglfmod = loadmodelonce(model_filename)
     end
@@ -349,16 +349,16 @@ function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, w
     x = collect(transpose(reduce(hcat, [Float64.(data[name]) for name in xnames])))
     y = tglfmod(x; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = :TGLFNN)
     if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
-        gknng = TGLFNN.loadmodelonce(model_filename * "_gknng23")
+        gknng = TGLFNN.loadmodelonce(model_filename * "_gknng24")
         err_g = gknng(vcat(x, y[1])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         y[1] .*= err_g
-        gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp23")
+        gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp24")
         err_p = gknnp(vcat(x, y[2])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         y[2] .*= err_p
-        gknne = TGLFNN.loadmodelonce(model_filename * "_gknne23")
+        gknne = TGLFNN.loadmodelonce(model_filename * "_gknne24")
         err_e = gknne(vcat(x, y[3])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         y[3] .*= err_e
-        gknni = TGLFNN.loadmodelonce(model_filename * "_gknni23")
+        gknni = TGLFNN.loadmodelonce(model_filename * "_gknni24")
         err_i = gknni(vcat(x, y[4])...; uncertain = uncertain, warn_nn_train_bounds = warn_nn_train_bounds, fidelity = fidelity)
         y[4] .*= err_i
     end
