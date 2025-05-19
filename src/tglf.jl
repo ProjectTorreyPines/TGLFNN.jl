@@ -587,9 +587,8 @@ function InputTGLF(
     dpdr = IMAS.gradient(rmin, press .* Pa_to_dyn)[gridpoint_cp]
     input_tglf.P_PRIME_LOC = abs.(q) ./ (rmin[gridpoint_cp] ./ a) .^ 2 .* rmin[gridpoint_cp] ./ bunit .^ 2 .* dpdr
 
-    dqdr = IMAS.gradient(rmin, q_profile)[gridpoint_cp]
-    s = rmin[gridpoint_cp] ./ q .* dqdr
-    input_tglf.Q_PRIME_LOC = q .^ 2 .* a .^ 2 ./ rmin[gridpoint_cp] .^ 2 .* s
+    dqdr = @views IMAS.gradient(rmin, q_profile)[gridpoint_cp]
+    input_tglf.Q_PRIME_LOC = @. @views q * a ^ 2 / rmin[gridpoint_cp] * dqdr
 
     # saturation rules
     input_tglf.ALPHA_ZF = 1.0 # 1 = default, -1 = low ky cutoff kypeak search
