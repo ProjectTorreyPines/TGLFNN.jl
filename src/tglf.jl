@@ -552,14 +552,13 @@ function InputTGLF(
         setproperty!(input_tglf, Symbol("RLTS_$species"), a .* dlntidr)
     end
 
-    input_tglf.BETAE = 8.0 * pi .* ne .* k .* Te ./ bunit .^ 2
-    loglam = 24.0 .- log.(sqrt.(ne) ./ Te)
-    input_tglf.XNUE = a ./ c_s * sqrt.(ions[1].element[1].a) .* e^4 .* pi .* ne .* loglam ./ (sqrt.(me) .* (k .* Te) .^ 1.5)
-    input_tglf.ZEFF = cp1d.zeff[gridpoint_cp]
-    rho_s = GACODE.rho_s(cp1d, eqt)[gridpoint_cp]
-    input_tglf.DEBYE = 7.43e2 * sqrt.(Te ./ ne) ./ rho_s
-    input_tglf.RMIN_LOC = rmin[gridpoint_cp] ./ a
-    input_tglf.RMAJ_LOC = Rmaj[gridpoint_cp] ./ a
+    input_tglf.BETAE = @. 8π * ne * k * Te / bunit ^ 2
+    input_tglf.XNUE = @. a / c_s * sqrt(ions[1].element[1].a) * e^4 * π * ne * (24.0 - log(sqrt(ne) / Te)) / (sqrt(me) * (k * Te) ^ 1.5)
+    input_tglf.ZEFF = @views cp1d.zeff[gridpoint_cp]
+    rho_s = @views GACODE.rho_s(cp1d, eqt)[gridpoint_cp]
+    input_tglf.DEBYE = @. 7.43e2 * sqrt(Te / ne) / rho_s
+    input_tglf.RMIN_LOC = @. @views rmin[gridpoint_cp] / a
+    input_tglf.RMAJ_LOC = @. @views Rmaj[gridpoint_cp] / a
     input_tglf.ZMAJ_LOC = 0
     input_tglf.DRMINDX_LOC = 1.0
 
