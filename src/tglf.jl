@@ -490,15 +490,15 @@ function InputTGLF(
     a = rmin[end]
     @views q = q_profile[gridpoint_cp]
 
-    Te = cp1d.electrons.temperature
-    dlntedr = -IMAS.calc_z(rmin, Te, :backward)
-    Te = Te[gridpoint_cp]
-    dlntedr = dlntedr[gridpoint_cp]
+    Te_full = cp1d.electrons.temperature
+    dlntedr_full = .-IMAS.calc_z(rmin, Te_full, :backward)
+    @views Te = Te_full[gridpoint_cp]
+    @views dlntedr = dlntedr_full[gridpoint_cp]
 
-    ne = cp1d.electrons.density_thermal ./ m³_to_cm³
-    dlnnedr = -IMAS.calc_z(rmin, ne, :backward)
-    ne = ne[gridpoint_cp]
-    dlnnedr = dlnnedr[gridpoint_cp]
+    ne_full = cp1d.electrons.density_thermal ./ m³_to_cm³
+    dlnnedr_full = .-IMAS.calc_z(rmin, ne_full, :backward)
+    @views ne = ne_full[gridpoint_cp]
+    @views dlnnedr = dlnnedr_full[gridpoint_cp]
 
     Bt = eqt.global_quantities.vacuum_toroidal_field.b0
     bunit = IMAS.interp1d(eqt1d.rho_tor_norm, GACODE.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm)[gridpoint_cp]
@@ -530,20 +530,19 @@ function InputTGLF(
 
     for iion in eachindex(ions)
         species = iion + 1
-
-        Ti = ions[iion].temperature
-        dlntidr = -IMAS.calc_z(rmin, Ti, :backward)
-        Ti = Ti[gridpoint_cp]
-        dlntidr = dlntidr[gridpoint_cp]
+        Ti_full = ions[iion].temperature
+        dlntidr_full = .-IMAS.calc_z(rmin, Ti_full, :backward)
+        @views Ti = Ti_full[gridpoint_cp]
+        @views dlntidr = dlntidr_full[gridpoint_cp]
 
         Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
         setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
         setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / md)
 
-        ni = ions[iion].density_thermal ./ m³_to_cm³
-        dlnnidr = -IMAS.calc_z(rmin, ni, :backward)
-        ni = ni[gridpoint_cp]
-        dlnnidr = dlnnidr[gridpoint_cp]
+        ni_full = ions[iion].density_thermal ./ m³_to_cm³
+        dlnnidr_full = .-IMAS.calc_z(rmin, ni_full, :backward)
+        @views ni = ni_full[gridpoint_cp]
+        @views dlnnidr = dlnnidr_full[gridpoint_cp]
 
         setproperty!(input_tglf, Symbol("TAUS_$species"), Ti ./ Te)
         setproperty!(input_tglf, Symbol("AS_$species"), ni ./ ne)
