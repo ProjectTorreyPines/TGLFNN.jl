@@ -488,7 +488,7 @@ function InputTGLF(
     end
 
     a = rmin[end]
-    q = q_profile[gridpoint_cp]
+    @views q = q_profile[gridpoint_cp]
 
     Te = cp1d.electrons.temperature
     dlntedr = -IMAS.calc_z(rmin, Te, :backward)
@@ -505,9 +505,8 @@ function InputTGLF(
     input_tglf = InputTGLFs([TGLFNN.InputTGLF() for k in eachindex(gridpoint_cp)])
 
     signb = sign(Bt)
-    signq = sign.(q)
     input_tglf.SIGN_BT = signb
-    input_tglf.SIGN_IT = signb .* signq
+    input_tglf.SIGN_IT = @. signb * sign(q)
 
     input_tglf.NS = length(ions) + 1 # add 1 to include electrons
 
@@ -516,11 +515,11 @@ function InputTGLF(
     input_tglf.TAUS_1 = 1.0
     input_tglf.AS_1 = 1.0
     input_tglf.ZS_1 = -1.0
-    input_tglf.RLNS_1 = a .* dlnnedr
-    input_tglf.RLTS_1 = a .* dlntedr
+    input_tglf.RLNS_1 = @. a * dlnnedr
+    input_tglf.RLTS_1 = @. a * dlntedr
 
-    c_s = GACODE.c_s(cp1d)[gridpoint_cp]
-    w0 = -1 * cp1d.rotation_frequency_tor_sonic
+    c_s = GACODE.c_s.(Te)
+    w0 = @. -cp1d.rotation_frequency_tor_sonic
     w0p = IMAS.gradient(rmin, w0)
     gamma_p = -Rmaj[gridpoint_cp] .* w0p[gridpoint_cp]
     gamma_e = -rmin[gridpoint_cp] ./ q .* w0p[gridpoint_cp]
@@ -550,8 +549,8 @@ function InputTGLF(
         setproperty!(input_tglf, Symbol("AS_$species"), ni ./ ne)
         setproperty!(input_tglf, Symbol("VPAR_$species"), input_tglf.VPAR_1)
         setproperty!(input_tglf, Symbol("VPAR_SHEAR_$species"), input_tglf.VPAR_SHEAR_1)
-        setproperty!(input_tglf, Symbol("RLNS_$species"), a * dlnnidr)
-        setproperty!(input_tglf, Symbol("RLTS_$species"), a * dlntidr)
+        setproperty!(input_tglf, Symbol("RLNS_$species"), a .* dlnnidr)
+        setproperty!(input_tglf, Symbol("RLTS_$species"), a .* dlntidr)
     end
 
     input_tglf.BETAE = 8.0 * pi .* ne .* k .* Te ./ bunit .^ 2
@@ -570,7 +569,7 @@ function InputTGLF(
     input_tglf.DRMAJDX_LOC = drmaj[gridpoint_cp]
     input_tglf.DZMAJDX_LOC = 0.0
 
-    input_tglf.Q_LOC = abs.(q)
+    input_tglf.Q_LOC = @. abs(q)
 
     input_tglf.KAPPA_LOC = kappa[gridpoint_cp]
 
