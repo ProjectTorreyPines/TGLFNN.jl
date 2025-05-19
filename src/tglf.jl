@@ -501,7 +501,8 @@ function InputTGLF(
     @views dlnnedr = dlnnedr_full[gridpoint_cp]
 
     Bt = eqt.global_quantities.vacuum_toroidal_field.b0
-    bunit = IMAS.interp1d(eqt1d.rho_tor_norm, GACODE.bunit(eqt1d) .* T_to_Gauss).(cp1d.grid.rho_tor_norm)[gridpoint_cp]
+    buitp = IMAS.interp1d(rho_eq, GACODE.bunit(eqt1d))
+    bunit = @. @views buitp(rho_cp[gridpoint_cp]) * T_to_Gauss
     input_tglf = InputTGLFs([TGLFNN.InputTGLF() for k in eachindex(gridpoint_cp)])
 
     signb = sign(Bt)
@@ -584,8 +585,8 @@ function InputTGLF(
     press = cp1d.pressure_thermal
     Pa_to_dyn = 10.0
 
-    dpdr = IMAS.gradient(rmin, press .* Pa_to_dyn)[gridpoint_cp]
-    input_tglf.P_PRIME_LOC = abs.(q) ./ (rmin[gridpoint_cp] ./ a) .^ 2 .* rmin[gridpoint_cp] ./ bunit .^ 2 .* dpdr
+    dpdr = @views IMAS.gradient(rmin, press)[gridpoint_cp] .* Pa_to_dyn
+    input_tglf.P_PRIME_LOC = @. @views abs(q) / (rmin[gridpoint_cp] / a) ^ 2 * rmin[gridpoint_cp] / bunit ^ 2 * dpdr
 
     dqdr = @views IMAS.gradient(rmin, q_profile)[gridpoint_cp]
     input_tglf.Q_PRIME_LOC = @. @views q * a ^ 2 / rmin[gridpoint_cp] * dqdr
