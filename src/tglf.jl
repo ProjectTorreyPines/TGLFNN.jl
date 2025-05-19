@@ -521,12 +521,12 @@ function InputTGLF(
     c_s = GACODE.c_s.(Te)
     w0 = @. -cp1d.rotation_frequency_tor_sonic
     w0p = IMAS.gradient(rmin, w0)
-    gamma_p = -Rmaj[gridpoint_cp] .* w0p[gridpoint_cp]
-    gamma_e = -rmin[gridpoint_cp] ./ q .* w0p[gridpoint_cp]
-    mach = Rmaj[gridpoint_cp] .* w0[gridpoint_cp] ./ c_s
-    input_tglf.VPAR_1 = -input_tglf.SIGN_IT .* mach
-    input_tglf.VPAR_SHEAR_1 = -input_tglf.SIGN_IT .* (a ./ c_s) .* gamma_p
-    input_tglf.VEXB_SHEAR = -gamma_e .* (a ./ c_s)
+    gamma_p = @. @views -Rmaj[gridpoint_cp] * w0p[gridpoint_cp]
+    gamma_e = @. @views -rmin[gridpoint_cp] / q * w0p[gridpoint_cp]
+    mach = @. @views Rmaj[gridpoint_cp] * w0[gridpoint_cp] / c_s
+    input_tglf.VPAR_1 = @. -input_tglf.SIGN_IT * mach
+    input_tglf.VPAR_SHEAR_1 = @. -input_tglf.SIGN_IT * (a / c_s) * gamma_p
+    input_tglf.VEXB_SHEAR = @. -gamma_e * (a / c_s)
 
     for iion in eachindex(ions)
         species = iion + 1
@@ -537,7 +537,7 @@ function InputTGLF(
 
         Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
         setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
-        setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a .* mp / md)
+        setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a .* mp ./ md)
 
         ni_full = ions[iion].density_thermal ./ m³_to_cm³
         dlnnidr_full = .-IMAS.calc_z(rmin, ni_full, :backward)
@@ -565,22 +565,22 @@ function InputTGLF(
 
     drmaj = IMAS.gradient(rmin, Rmaj)
 
-    input_tglf.DRMAJDX_LOC = drmaj[gridpoint_cp]
+    input_tglf.DRMAJDX_LOC = @views drmaj[gridpoint_cp]
     input_tglf.DZMAJDX_LOC = 0.0
 
     input_tglf.Q_LOC = @. abs(q)
 
-    input_tglf.KAPPA_LOC = kappa[gridpoint_cp]
+    input_tglf.KAPPA_LOC = @views kappa[gridpoint_cp]
 
     skappa = rmin .* IMAS.gradient(rmin, kappa) ./ kappa
     sdelta = rmin .* IMAS.gradient(rmin, delta)
     szeta = rmin .* IMAS.gradient(rmin, zeta)
 
-    input_tglf.S_KAPPA_LOC = skappa[gridpoint_cp]
-    input_tglf.DELTA_LOC = delta[gridpoint_cp]
-    input_tglf.S_DELTA_LOC = sdelta[gridpoint_cp]
-    input_tglf.ZETA_LOC = zeta[gridpoint_cp]
-    input_tglf.S_ZETA_LOC = szeta[gridpoint_cp]
+    input_tglf.S_KAPPA_LOC = @views skappa[gridpoint_cp]
+    input_tglf.DELTA_LOC = @views delta[gridpoint_cp]
+    input_tglf.S_DELTA_LOC = @views sdelta[gridpoint_cp]
+    input_tglf.ZETA_LOC = @views zeta[gridpoint_cp]
+    input_tglf.S_ZETA_LOC = @views szeta[gridpoint_cp]
 
     press = cp1d.pressure_thermal
     Pa_to_dyn = 10.0
