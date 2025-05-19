@@ -145,8 +145,9 @@ mutable struct InputTGLFs
 end
 
 function Base.setproperty!(inputTGLFs::InputTGLFs, field::Symbol, value::AbstractVector{<:Any})
-    @assert length(value) == length(getfield(inputTGLFs, :tglfs))
-    for (k, inputTGLF) in enumerate(getfield(inputTGLFs, :tglfs))
+    tglfs = getfield(inputTGLFs, :tglfs)
+    @assert length(value) == length(tglfs)
+    for (k, inputTGLF) in enumerate(tglfs)
         setproperty!(inputTGLF, field, value[k])
     end
     return value
@@ -160,11 +161,17 @@ function Base.setproperty!(inputTGLFs::InputTGLFs, field::Symbol, value::Any)
 end
 
 function Base.getproperty(inputTGLFs::InputTGLFs, field::Symbol)
-    data = fieldtype(typeof(getfield(inputTGLFs, :tglfs)[1]), field)[]
-    for inputTGLF in getfield(inputTGLFs, :tglfs)
-        push!(data, getproperty(inputTGLF, field))
+    if field === :tglfs
+        return getfield(inputTGLFs, :tglfs)
+    else
+        tglfs = getfield(inputTGLFs, :tglfs)
+        FT = fieldtype(typeof(tglfs[1]), field)
+        data = Vector{FT}(undef, length(tglfs))
+        for (k, inputTGLF) in enumerate(tglfs)
+            data[k] = getproperty(inputTGLF, field)
+        end
+        return data
     end
-    return data
 end
 
 function Base.getindex(inputTGLFs::InputTGLFs, index::Int)
@@ -445,6 +452,8 @@ function InputTGLF(
     T_to_Gauss = IMAS.cgs.T_to_Gauss
 
     eqt1d = eqt.profiles_1d
+    rho_cp = cp1d.grid.rho_tor_norm
+    rho_eq = eqt1d.rho_tor_norm
 
     if lump_ions
         ions = IMAS.lump_ions_as_bulk_and_impurity(cp1d)
@@ -452,30 +461,30 @@ function InputTGLF(
         ions = cp1d.ion
     end
 
-    Rmaj = IMAS.interp1d(eqt1d.rho_tor_norm, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(cp1d.grid.rho_tor_norm)
+    Rmaj = IMAS.interp1d(rho_eq, m_to_cm * 0.5 * (eqt1d.r_outboard .+ eqt1d.r_inboard)).(rho_cp)
 
-    rmin = GACODE.r_min_core_profiles(eqt1d, cp1d.grid.rho_tor_norm)
+    rmin = GACODE.r_min_core_profiles(eqt1d, rho_cp)
 
-    q_profile = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.q).(cp1d.grid.rho_tor_norm)
+    q_profile = IMAS.interp1d(rho_eq, eqt1d.q).(rho_cp)
 
     if !ismissing(eqt1d, :elongation)
-        kappa = IMAS.interp1d(eqt1d.rho_tor_norm, eqt1d.elongation).(cp1d.grid.rho_tor_norm)
+        kappa = IMAS.interp1d(rho_eq, eqt1d.elongation).(rho_cp)
     else
-        kappa = zero(cp1d.grid.rho_tor_norm)
+        kappa = zero(rho_cp)
     end
 
     if !ismissing(eqt1d, :triangularity_lower) && !ismissing(eqt1d, :triangularity_upper)
-        delta = IMAS.interp1d(eqt1d.rho_tor_norm, 0.5 * (eqt1d.triangularity_lower + eqt1d.triangularity_upper)).(cp1d.grid.rho_tor_norm)
+        delta = IMAS.interp1d(rho_eq, 0.5 * (eqt1d.triangularity_lower + eqt1d.triangularity_upper)).(rho_cp)
     else
-        delta = zero(cp1d.grid.rho_tor_norm)
+        delta = zero(rho_cp)
     end
 
     if !ismissing(eqt1d, :squareness_lower_inner) && !ismissing(eqt1d, :squareness_lower_outer) && !ismissing(eqt1d, :squareness_upper_inner) &&
        !ismissing(eqt1d, :squareness_upper_outer)
-        tmp = 0.25 * (eqt1d.squareness_lower_inner .+ eqt1d.squareness_lower_outer .+ eqt1d.squareness_upper_inner .+ eqt1d.squareness_upper_outer)
-        zeta = IMAS.interp1d(eqt1d.rho_tor_norm, tmp).(cp1d.grid.rho_tor_norm)
+        tmp = 0.25 .* (eqt1d.squareness_lower_inner .+ eqt1d.squareness_lower_outer .+ eqt1d.squareness_upper_inner .+ eqt1d.squareness_upper_outer)
+        zeta = IMAS.interp1d(rho_eq, tmp).(rho_cp)
     else
-        zeta = zero(cp1d.grid.rho_tor_norm)
+        zeta = zero(rho_cp)
     end
 
     a = rmin[end]
