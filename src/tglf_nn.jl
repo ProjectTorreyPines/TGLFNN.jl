@@ -160,19 +160,19 @@ function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bou
     xx = [contains(name, "_log10") ? log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
     if warn_nn_train_bounds # training bounds are on the original data but after log10
         for ix in eachindex(xx)
-            if any(xx[ix] .< fluxmodel.xbounds[ix, 1])
+            if xx[ix] < fluxmodel.xbounds[ix, 1]
                 @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(minimum(xx[ix,:])) is below bound of $(fluxmodel.xbounds[ix,1])")
-            elseif any(xx[ix] .> fluxmodel.xbounds[ix, 2])
+            elseif xx[ix] > fluxmodel.xbounds[ix, 2]
                 @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(maximum(xx[ix,:])) is above bound of $(fluxmodel.xbounds[ix,2])")
             end
         end
     end
-    xn = (xx .- fluxmodel.xm) ./ fluxmodel.xσ
-    yn = fluxmodel.fluxmodel(xn)
+    @. xx = (xx - fluxmodel.xm) / fluxmodel.xσ
+    yy = fluxmodel.fluxmodel(xx)
     if fidelity == :GKNN
-        yy = yn
+        # yy is good
     elseif fidelity == :TGLFNN
-        yy = yn .* fluxmodel.yσ .+ fluxmodel.ym
+        @. yy = yy * fluxmodel.yσ + fluxmodel.ym
     end
     return yy
 end
@@ -239,7 +239,7 @@ function (fluxmodel::TGLFmodel)(args...; uncertain::Bool=false, warn_nn_train_bo
 end
 
 #= ========== =#
-#  run_tglfnn 
+#  run_tglfnn
 #= ========== =#
 """
     run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
