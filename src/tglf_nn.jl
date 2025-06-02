@@ -332,7 +332,7 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
             tmp[4, :] .*= err_i[1, :]
         elseif model_filename in ["sat3_em_d3d+mastu+nstx_azf-1", "sat2_em_d3d+mastu+nstx_azf-1"]
             gknn = TGLFNN.loadmodelonce(model_filename * "_gknn25")
-            err = gknn(vcat(inputs, tmp)...; uncertain, warn_nn_train_bounds, fidelity)
+            err = flux_array(gknn, vcat(inputs, tmp); uncertain, warn_nn_train_bounds, fidelity)
             tmp .*= err
         end
     end
