@@ -319,6 +319,7 @@ function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnam
     
     tglfmod = model
     inputs = zeros(length(xnames), length(input_tglfs))
+    spectra_inputs = zeros(24, length(input_tglfs))
     for (i, input_tglf) in enumerate(input_tglfs)
         for (k, item) in enumerate(xnames)
             has_log10 = occursin("_log10", item)  # Check if the key contains "_log10"
@@ -336,8 +337,15 @@ function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnam
     
             inputs[k, i] = value
         end
+        spectra_inputs[:, i] = input_tglf.KY_SPECTRUM_ONNX
     end
-    tmp = model(Dict("input" => Float32.(inputs')))["output"]'
+
+    #Grab KY_GRID data
+    #Make matrix with it
+    #Add it to forward pass of Model dict
+    #SMURF
+    print(spectra_inputs)
+    tmp = model(Dict("input" => Float32.(inputs'), "spectra" => Float32.(spectra_inputs')))["output"]'
     tmp_new = reduce(hcat, [tmp[1, :],tmp[4, :],tmp[2, :],tmp[3, :]])'
     sol = [flux_solution(tmp_new[:, i]...) for i in eachindex(input_tglfs)]
     return sol
@@ -349,6 +357,7 @@ function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, 
     # sess_options = CreateSessionOptions(api)
     # sess_options.intra_op_num_threads = 2  # Adjust based on your system
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    print("REALLY SHOULDNT BE HERE, REALLY SHOULDNT BE HERE, REALLY SHOULDNT BE HERE")
     path = ORT.testdatapath(onnx_path)
     model = ORT.load_inference(path)
     tglfmod = model
@@ -364,6 +373,7 @@ function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vecto
     # sess_options = CreateSessionOptions(api)
     # sess_options.intra_op_num_threads = 2  # Adjust based on your system
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
+    print("REALLY SHOULDNT BE HERE2222, REALLY SHOULDNT BE HERE, REALLY SHOULDNT BE HERE2222222")
     path = ORT.testdatapath(onnx_path)
     model = ORT.load_inference(path)
     inputs = zeros(length(xnames))
