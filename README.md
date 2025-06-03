@@ -1,10 +1,8 @@
 # TGLFNN.jl
 
-Run TGLF-NN, TGLF, and QLGYRO models
+Run TGLF-NN, GKNN, TGLF, and QLGYRO models. 
 
-NOTE: Running TGLF and QLGYRO requires GACODE executables to be locally installed.
-
-Link to instructions on GACODE installation: https://gacode.io/build.html
+For a tutorial on how to run these models, see the [FUSE flux-matcher tutorial](https://github.com/ProjectTorreyPines/FuseExamples/blob/master/fluxmatcher.ipynb).
 
 ## Online documentation
 For more details, see the [online documentation](https://projecttorreypines.github.io/TGLFNN.jl/dev).

@@ -61,7 +61,7 @@ function Base.getproperty(ensemble::TGLFNNensemble, field::Symbol)
     if field == :models
         return getfield(ensemble, field)
     elseif field == :fluxmodel
-        error("Running TLGF ensemble like a model")
+        error("Running TGLF ensemble like a model")
     else
         return getfield(ensemble.models[1], field)
     end
@@ -145,41 +145,49 @@ function loadmodel(filename::AbstractString)
 end
 
 function available_models()
-    return [replace(model, ".bson"=>"") for model in readdir(dirname(@__DIR__) * "/models/") if endswith(model,".bson")]
+    models_dir = joinpath(dirname(@__DIR__), "models")
+    return [replace(model, r"\.(bson|onnx)$" => "") for model in readdir(models_dir) if endswith(model, ".bson") || endswith(model, ".onnx")]
 end
 
 #= ==================================== =#
 #  functions to get the fluxes solution
 #= ==================================== =#
-function flux_array(fluxmodel::TGLFNNmodel, x::AbstractMatrix; warn_nn_train_bounds::Bool=true)
-    return hcat(collect(map(x0 -> flux_array(fluxmodel, x0; warn_nn_train_bounds), eachslice(x; dims=2)))...)
+function flux_array(fluxmodel::TGLFNNmodel, x::AbstractMatrix; warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
+    return hcat(collect(map(x0 -> flux_array(fluxmodel, x0; warn_nn_train_bounds, fidelity), eachslice(x; dims=2)))...)
 end
 
-function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bounds::Bool=true)
-    xx = [contains(name, "_log10") ?  log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
+function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
+    xx = [contains(name, "_log10") ? log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
     if warn_nn_train_bounds # training bounds are on the original data but after log10
         for ix in eachindex(xx)
-            if any(xx[ix] .< fluxmodel.xbounds[ix, 1])
+            if xx[ix] < fluxmodel.xbounds[ix, 1]
                 @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(minimum(xx[ix,:])) is below bound of $(fluxmodel.xbounds[ix,1])")
-            elseif any(xx[ix] .> fluxmodel.xbounds[ix, 2])
+            elseif xx[ix] > fluxmodel.xbounds[ix, 2]
                 @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(maximum(xx[ix,:])) is above bound of $(fluxmodel.xbounds[ix,2])")
             end
         end
     end
-    xn = (xx .- fluxmodel.xm) ./ fluxmodel.xσ
-    yn = fluxmodel.fluxmodel(xn)
-    yy = yn .* fluxmodel.yσ .+ fluxmodel.ym
+    @. xx = (xx - fluxmodel.xm) / fluxmodel.xσ
+    yy = fluxmodel.fluxmodel(xx)
+    if fidelity == :GKNN
+        # yy is good
+    elseif fidelity == :TGLFNN
+        @. yy = yy * fluxmodel.yσ + fluxmodel.ym
+    end
     return yy
 end
 
-function flux_array(fluxensemble::TGLFNNensemble, x::AbstractArray; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
+function flux_array(fluxensemble::TGLFNNensemble, x::AbstractArray; uncertain::Bool=false, warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
     nmodels = length(fluxensemble.models)
     nouts = length(fluxensemble.models[1].ynames)
+    if fidelity == :GKNN
+        nouts = div(nouts, 2)
+    end
     nsamples = size(x)[2]
 
     tmp = zeros(nmodels, nouts, nsamples)
     Threads.@threads for k in 1:length(fluxensemble.models)
-        tmp[k, :, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds)
+        tmp[k, :, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds, fidelity)
     end
 
     mean, std = StatsBase.mean_and_std(tmp, 1; corrected=true)
@@ -190,13 +198,16 @@ function flux_array(fluxensemble::TGLFNNensemble, x::AbstractArray; uncertain::B
     end
 end
 
-function flux_array(fluxensemble::TGLFNNensemble, x::AbstractVector; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
+function flux_array(fluxensemble::TGLFNNensemble, x::AbstractVector; uncertain::Bool=false, warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
     nmodels = length(fluxensemble.models)
     nouts = length(fluxensemble.models[1].ynames)
+    if fidelity == :GKNN
+        nouts = div(nouts, 2)
+    end
 
     tmp = zeros(nmodels, nouts)
     Threads.@threads for k in 1:length(fluxensemble.models)
-        tmp[k, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds)
+        tmp[k, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds, fidelity)
     end
 
     mean, std = StatsBase.mean_and_std(tmp, 1; corrected=true)
@@ -207,31 +218,31 @@ function flux_array(fluxensemble::TGLFNNensemble, x::AbstractVector; uncertain::
     end
 end
 
-function flux_array(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
+function flux_array(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
     args = reshape([k for k in args], (length(args), 1))
-    return flux_array(fluxmodel, args; uncertain, warn_nn_train_bounds)
+    return flux_array(fluxmodel, args; uncertain, warn_nn_train_bounds, fidelity)
 end
 
-function flux_solution(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
-    return flux_solution(flux_array(fluxmodel, collect(args); uncertain, warn_nn_train_bounds)...)
+function flux_solution(fluxmodel::TGLFmodel, args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
+    return flux_solution(flux_array(fluxmodel, collect(args); uncertain, warn_nn_train_bounds, fidelity)...)
 end
 
 #= ======================= =#
 # functors for TGLFNNmodel
 #= ======================= =#
-function (fluxmodel::TGLFmodel)(x::AbstractArray; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
-    return flux_array(fluxmodel, x; uncertain, warn_nn_train_bounds)
+function (fluxmodel::TGLFmodel)(x::AbstractArray; uncertain::Bool=false, warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
+    return flux_array(fluxmodel, x; uncertain, warn_nn_train_bounds, fidelity)
 end
 
-function (fluxmodel::TGLFmodel)(args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true)
-    return flux_solution(fluxmodel, args...; uncertain, warn_nn_train_bounds)
+function (fluxmodel::TGLFmodel)(args...; uncertain::Bool=false, warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
+    return flux_solution(fluxmodel, args...; uncertain, warn_nn_train_bounds, fidelity)
 end
 
 #= ========== =#
-#  run_tglfnn 
+#  run_tglfnn
 #= ========== =#
 """
-    run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
+    run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
 
 Run TGLFNN starting from a InputTGLF, using a specific `model_filename`.
 
@@ -241,24 +252,44 @@ The warn_nn_train_bounds checks against the standard deviation of the inputs to 
 
 Returns a `flux_solution` structure
 """
-function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
-    tglfmod = TGLFNN.loadmodelonce(model_filename)
+function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
+    if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
+        tglfmod = loadmodelonce(model_filename * "_tglfnn24")
+    else
+        tglfmod = loadmodelonce(model_filename)
+    end
     inputs = zeros(length(tglfmod.xnames))
     for (k, item) in enumerate(tglfmod.xnames)
         item = replace(item, "_log10" => "")
-        if item == "RLNS_12"
-            value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
-        else
-            value = getfield(input_tglf, Symbol(item))
-        end
+        value = getfield(input_tglf, Symbol(item))
         inputs[k] = value
     end
-    sol = tglfmod(inputs...; uncertain, warn_nn_train_bounds)
+    sol = tglfmod(inputs...; uncertain, warn_nn_train_bounds, fidelity=:TGLFNN)
+    if fidelity == :GKNN
+        if model_filename in ["sat3_em_d3d_azf-1"]
+            gknng = TGLFNN.loadmodelonce(model_filename * "_gknng24")
+            err_g = gknng(vcat(inputs, sol[1])...; uncertain, warn_nn_train_bounds, fidelity)
+            sol[1] .*= err_g
+            gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp24")
+            err_p = gknnp(vcat(inputs, sol[2])...; uncertain, warn_nn_train_bounds, fidelity)
+            sol[2] .*= err_p
+            gknne = TGLFNN.loadmodelonce(model_filename * "_gknne24")
+            err_e = gknne(vcat(inputs, sol[3])...; uncertain, warn_nn_train_bounds, fidelity)
+            sol[3] .*= err_e
+            gknni = TGLFNN.loadmodelonce(model_filename * "_gknni24")
+            err_i = gknni(vcat(inputs, sol[4])...; uncertain, warn_nn_train_bounds, fidelity)
+            sol[4] .*= err_i
+        elseif model_filename in ["sat3_em_d3d+mastu+nstx_azf-1", "sat2_em_d3d+mastu+nstx_azf-1"]
+            gknn = TGLFNN.loadmodelonce(model_filename * "_gknn25")
+            err = gknn(vcat(inputs, sol)...; uncertain, warn_nn_train_bounds, fidelity)
+            sol .*= err
+        end
+    end
     return sol
 end
 
 """
-    run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
+    run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
 
 Run TGLFNN for multiple InputTGLF, using a specific `model_filename`.
 
@@ -270,27 +301,47 @@ The warn_nn_train_bounds checks against the standard deviation of the inputs to 
 
 Returns a vector of `flux_solution` structures
 """
-function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)
-    tglfmod = TGLFNN.loadmodelonce(model_filename)
+function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
+    if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
+        tglfmod = loadmodelonce(model_filename * "_tglfnn24")
+    else
+        tglfmod = loadmodelonce(model_filename)
+    end
     inputs = zeros(length(tglfmod.xnames), length(input_tglfs))
     for (i, input_tglf) in enumerate(input_tglfs)
         for (k, item) in enumerate(tglfmod.xnames)
             item = replace(item, "_log10" => "")
-            if item == "RLNS_12"
-                value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
-            else
-                value = getfield(input_tglf, Symbol(item))
-            end
+            value = getfield(input_tglf, Symbol(item))
             inputs[k, i] = value
         end
     end
-    tmp = flux_array(tglfmod, inputs; uncertain, warn_nn_train_bounds)
+    tmp = flux_array(tglfmod, inputs; uncertain, warn_nn_train_bounds, fidelity=:TGLFNN)
+    if fidelity == :GKNN
+        if model_filename in ["sat3_em_d3d_azf-1"]
+            gknng = TGLFNN.loadmodelonce(model_filename * "_gknng24")
+            err_g = flux_array(gknng, vcat(inputs, reshape(tmp[1, :], 1, :)); uncertain, warn_nn_train_bounds, fidelity)
+            tmp[1, :] .*= err_g[1, :]
+            gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp24")
+            err_p = flux_array(gknnp, vcat(inputs, reshape(tmp[2, :], 1, :)); uncertain, warn_nn_train_bounds, fidelity)
+            tmp[2, :] .*= err_p[1, :]
+            gknne = TGLFNN.loadmodelonce(model_filename * "_gknne24")
+            err_e = flux_array(gknne, vcat(inputs, reshape(tmp[3, :], 1, :)); uncertain, warn_nn_train_bounds, fidelity)
+            tmp[3, :] .*= err_e[1, :]
+            gknni = TGLFNN.loadmodelonce(model_filename * "_gknni24")
+            err_i = flux_array(gknni, vcat(inputs, reshape(tmp[4, :], 1, :)); uncertain, warn_nn_train_bounds, fidelity)
+            tmp[4, :] .*= err_i[1, :]
+        elseif model_filename in ["sat3_em_d3d+mastu+nstx_azf-1", "sat2_em_d3d+mastu+nstx_azf-1"]
+            gknn = TGLFNN.loadmodelonce(model_filename * "_gknn25")
+            err = flux_array(gknn, vcat(inputs, tmp); uncertain, warn_nn_train_bounds, fidelity)
+            tmp .*= err
+        end
+    end
     sol = [flux_solution(tmp[:, i]...) for i in eachindex(input_tglfs)]
     return sol
 end
 
 """
-    run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)::Dict
+    run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
 
 Run TGLFNN from a dictionary, using a specific `model_filename`.
 
@@ -300,11 +351,35 @@ The warn_nn_train_bounds checks against the standard deviation of the inputs to 
 
 Returns a dictionary with fluxes
 """
-function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool)::Dict
-    tglfmod = loadmodelonce(model_filename)
+function run_tglfnn(data::Dict; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
+    if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
+        tglfmod = loadmodelonce(model_filename * "_tglfnn24")
+    else
+        tglfmod = loadmodelonce(model_filename)
+    end
     xnames = [replace(name, "_log10" => "") for name in tglfmod.xnames]
     x = collect(transpose(reduce(hcat, [Float64.(data[name]) for name in xnames])))
-    y = tglfmod(x; uncertain, warn_nn_train_bounds)
+    y = tglfmod(x; uncertain, warn_nn_train_bounds, fidelity=:TGLFNN)
+    if fidelity == :GKNN
+        if model_filename in ["sat3_em_d3d_azf-1"]
+            gknng = TGLFNN.loadmodelonce(model_filename * "_gknng24")
+            err_g = gknng(vcat(x, y[1])...; uncertain, warn_nn_train_bounds, fidelity)
+            y[1] .*= err_g
+            gknnp = TGLFNN.loadmodelonce(model_filename * "_gknnp24")
+            err_p = gknnp(vcat(x, y[2])...; uncertain, warn_nn_train_bounds, fidelity)
+            y[2] .*= err_p
+            gknne = TGLFNN.loadmodelonce(model_filename * "_gknne24")
+            err_e = gknne(vcat(x, y[3])...; uncertain, warn_nn_train_bounds, fidelity)
+            y[3] .*= err_e
+            gknni = TGLFNN.loadmodelonce(model_filename * "_gknni24")
+            err_i = gknni(vcat(x, y[4])...; uncertain, warn_nn_train_bounds, fidelity)
+            y[4] .*= err_i
+        elseif model_filename in ["sat3_em_d3d+mastu+nstx_azf-1", "sat2_em_d3d+mastu+nstx_azf-1"]
+            gknn = TGLFNN.loadmodelonce(model_filename * "_gknn25")
+            err = gknn(vcat(x, y)...; uncertain, warn_nn_train_bounds, fidelity)
+            y .*= err
+        end
+    end
     ynames = [replace(name, "OUT_" => "") for name in tglfmod.ynames]
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames))
 end
@@ -314,8 +389,7 @@ function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnam
     # sess_options = CreateSessionOptions(api)
     # sess_options.intra_op_num_threads = 2  # Adjust based on your system
     # sess_options.inter_op_num_threads = 2  # Adjust based on your system
-    path = ORT.testdatapath(onnx_path)
-    model = ORT.load_inference(path)
+    model = load_onnx_model(onnx_path)
     
     tglfmod = model
     inputs = zeros(length(xnames), length(input_tglfs))
@@ -346,48 +420,64 @@ function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnam
     #SMURF
     print(spectra_inputs)
     tmp = model(Dict("input" => Float32.(inputs'), "spectra" => Float32.(spectra_inputs')))["output"]'
-    tmp_new = reduce(hcat, [tmp[1, :],tmp[4, :],tmp[2, :],tmp[3, :]])'
-    sol = [flux_solution(tmp_new[:, i]...) for i in eachindex(input_tglfs)]
+    tmp_new = reorder_output(tmp, [1, 4, 2, 3])
+    sol = [flux_solution(tmp_new[:, i]...) for i in 1:size(tmp_new, 2)]
     return sol
 end
+    
+function load_onnx_model(onnx_path::String)
+    if !contains(onnx_path, "/models/")
+        onnx_path = joinpath(dirname(@__DIR__), "models", onnx_path)
+        if !endswith(onnx_path, ".onnx")
+            onnx_path *= ".onnx"
+        end
+        if !isfile(onnx_path)
+            error("TGLFNN model does not exist in $onnx_path")
+        end
+        spectra_inputs[:, i] = input_tglf.KY_SPECTRUM_ONNX
+    end
+    return ORT.load_inference(ORT.testdatapath(onnx_path))
+end
 
+function build_input_value(input_tglf::InputTGLF, name::String)
+    key = replace(name, "_log10" => "")
+    value = getfield(input_tglf, Symbol(key))
+    return occursin("_log10", name) ? log10(value) : value
+end
 
-function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)::Dict
-    # api = GetApi();
-    # sess_options = CreateSessionOptions(api)
-    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
-    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
-    print("REALLY SHOULDNT BE HERE, REALLY SHOULDNT BE HERE, REALLY SHOULDNT BE HERE")
-    path = ORT.testdatapath(onnx_path)
-    model = ORT.load_inference(path)
-    tglfmod = model
+function build_inputs(input_tglfs::Vector{InputTGLF}, xnames::Vector{String})
+    return hcat([[build_input_value(t, x) for x in xnames] for t in input_tglfs]...)
+end
+
+# Reorder output rows to match a new order, e.g. [1, 4, 2, 3]
+function reorder_output(out::AbstractMatrix, order::Vector{Int})
+    return reduce(hcat, [out[i, :] for i in order])'
+end
+
+# function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})
+#     model = load_onnx_model(onnx_path)
+#     inputs = build_inputs(input_tglfs, xnames)
+#     tmp = model(Dict("input" => Float32.(inputs')))["output"]'
+#     tmp_new = reorder_output(tmp, [1, 4, 2, 3])
+#     sol = [flux_solution(tmp_new[:, i]...) for i in 1:size(tmp_new, 2)]
+#     return sol
+# end
+
+function run_tglfnn_onnx(data::Dict, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})::Dict
+    model = load_onnx_model(onnx_path)
     xnames_clean = [replace(name, "_log10" => "") for name in xnames]
-    x = Dict("input" => Float32.(collect(transpose(reduce(hcat, [Float64.(data[name]) for name in xnames_clean]))))')
-    y = tglfmod(x)["output"]'  # Ensure latest version runs
+    x = reduce(hcat, [Float64.(data[name]) for name in xnames_clean])
+    x = Float32.(x')
+    y = model(Dict("input" => x))["output"]'
     ynames_clean = [replace(name, "OUT_" => "") for name in ynames]
     return Dict(name => y[k, :] for (k, name) in enumerate(ynames_clean))
 end
 
-function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vector{String}, ynames::Vector{String};)
-    # api = GetApi();
-    # sess_options = CreateSessionOptions(api)
-    # sess_options.intra_op_num_threads = 2  # Adjust based on your system
-    # sess_options.inter_op_num_threads = 2  # Adjust based on your system
-    print("REALLY SHOULDNT BE HERE2222, REALLY SHOULDNT BE HERE, REALLY SHOULDNT BE HERE2222222")
-    path = ORT.testdatapath(onnx_path)
-    model = ORT.load_inference(path)
-    inputs = zeros(length(xnames))
-    for (k, item) in enumerate(xnames)
-        item = replace(item, "_log10" => "")
-        if item == "RLNS_12"
-            value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
-        else
-            value = getfield(input_tglf, Symbol(item))
-        end
-        inputs[k] = value
-    end
-    sol = model(Dict("input" => Float32.(inputs')))["output"]'
-    sol_new = [sol[1],sol[4],sol[2],sol[3]]
+function run_tglfnn_onnx(input_tglf::InputTGLF, onnx_path::String, xnames::Vector{String}, ynames::Vector{String})
+    model = load_onnx_model(onnx_path)
+    values = [build_input_value(input_tglf, x) for x in xnames]
+    sol = model(Dict("input" => Float32.([values]')))["output"]'
+    sol_new = [sol[1], sol[4], sol[2], sol[3]]
     return sol_new
 end
 
@@ -425,14 +515,14 @@ function flux_solution(xx::Vararg{T}) where {T<:Real}
         ENERGY_FLUX_i = 4
         PARTICLE_FLUX_e = 1
         STRESS_TOR_i = 2
-        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
+        sol = GACODE.FluxSolution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[], xx[STRESS_TOR_i])
     else
         ENERGY_FLUX_e = n_fields - 1
         ENERGY_FLUX_i = n_fields
         PARTICLE_FLUX_e = 1
         PARTICLE_FLUX_i = 2:n_fields-3
         STRESS_TOR_i = n_fields - 2
-        sol = IMAS.flux_solution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
+        sol = GACODE.FluxSolution(xx[ENERGY_FLUX_e], xx[ENERGY_FLUX_i], xx[PARTICLE_FLUX_e], T[xx[i] for i in PARTICLE_FLUX_i], xx[STRESS_TOR_i])
     end
     return sol
 end
