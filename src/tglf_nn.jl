@@ -337,6 +337,7 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
         end
     end
     sol = [flux_solution(tmp[:, i]...) for i in eachindex(input_tglfs)]
+    print(sol)
     return sol
 end
 
@@ -392,36 +393,16 @@ function run_tglfnn_onnx(input_tglfs::Vector{InputTGLF}, onnx_path::String, xnam
     model = load_onnx_model(onnx_path)
     
     tglfmod = model
-    inputs = zeros(length(xnames), length(input_tglfs))
+    inputs = build_inputs(input_tglfs, xnames)
     spectra_inputs = zeros(24, length(input_tglfs))
     for (i, input_tglf) in enumerate(input_tglfs)
-        for (k, item) in enumerate(xnames)
-            has_log10 = occursin("_log10", item)  # Check if the key contains "_log10"
-            item_clean = replace(item, "_log10" => "")
-    
-            if item_clean == "RLNS_12"
-                value = sqrt(input_tglf.RLNS_1^2 + input_tglf.RLNS_2^2)
-            else
-                value = getfield(input_tglf, Symbol(item_clean))
-            end
-    
-            if has_log10
-                value = log10(value)
-            end
-    
-            inputs[k, i] = value
-        end
         spectra_inputs[:, i] = input_tglf.KY_SPECTRUM_ONNX
     end
-
-    #Grab KY_GRID data
-    #Make matrix with it
-    #Add it to forward pass of Model dict
-    #SMURF
-    print(spectra_inputs)
+    print(spectra_inputs[:, 1])
     tmp = model(Dict("input" => Float32.(inputs'), "spectra" => Float32.(spectra_inputs')))["output"]'
     tmp_new = reorder_output(tmp, [1, 4, 2, 3])
-    sol = [flux_solution(tmp_new[:, i]...) for i in 1:size(tmp_new, 2)]
+    sol = [flux_solution(tmp_new[:, i]...) for i in eachindex(input_tglfs)]
+    print(sol)
     return sol
 end
     
@@ -434,7 +415,6 @@ function load_onnx_model(onnx_path::String)
         if !isfile(onnx_path)
             error("TGLFNN model does not exist in $onnx_path")
         end
-        spectra_inputs[:, i] = input_tglf.KY_SPECTRUM_ONNX
     end
     return ORT.load_inference(ORT.testdatapath(onnx_path))
 end
