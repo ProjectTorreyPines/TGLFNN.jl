@@ -553,8 +553,8 @@ function InputTGLF(
         setproperty!(input_tglf, Symbol("RLTS_$species"), a .* dlntidr)
     end
 
-    input_tglf.BETAE = @. 8π * ne * k * Te / bunit ^ 2
-    input_tglf.XNUE = @. a / c_s * sqrt(ions[1].element[1].a) * e^4 * π * ne * (24.0 - log(sqrt(ne) / Te)) / (sqrt(me) * (k * Te) ^ 1.5)
+    input_tglf.BETAE = @. 8π * ne * k * Te / bunit^2
+    input_tglf.XNUE = @. a / c_s * sqrt(ions[1].element[1].a) * e^4 * π * ne * (24.0 - log(sqrt(ne) / Te)) / (sqrt(me) * (k * Te)^1.5)
     input_tglf.ZEFF = @views cp1d.zeff[gridpoint_cp]
     rho_s = @views GACODE.rho_s(cp1d, eqt)[gridpoint_cp]
     input_tglf.DEBYE = @. 7.43e2 * sqrt(Te / ne) / rho_s
@@ -586,10 +586,10 @@ function InputTGLF(
     Pa_to_dyn = 10.0
 
     dpdr = @views IMAS.gradient(rmin, press)[gridpoint_cp] .* Pa_to_dyn
-    input_tglf.P_PRIME_LOC = @. @views abs(q) / (rmin[gridpoint_cp] / a) ^ 2 * rmin[gridpoint_cp] / bunit ^ 2 * dpdr
+    input_tglf.P_PRIME_LOC = @. @views abs(q) / (rmin[gridpoint_cp] / a)^2 * rmin[gridpoint_cp] / bunit^2 * dpdr
 
     dqdr = @views IMAS.gradient(rmin, q_profile)[gridpoint_cp]
-    input_tglf.Q_PRIME_LOC = @. @views q * a ^ 2 / rmin[gridpoint_cp] * dqdr
+    input_tglf.Q_PRIME_LOC = @. @views q * a^2 / rmin[gridpoint_cp] * dqdr
 
     # saturation rules
     input_tglf.ALPHA_ZF = 1.0 # 1 = default, -1 = low ky cutoff kypeak search
@@ -781,37 +781,61 @@ end
 Reads filename (`input.tglf` or `input.tglf.gen` format) and populates input_tglf
 """
 function load(input_tglf::InputTGLF, filename::String)
-    multi_line = open(filename, "r") do file
-        return read(filename, String)
+    lines = open(filename, "r") do file
+        return filter(x -> length(x) > 0, map(strip, split(read(file, String), "\n")))
     end
 
-    filtered_lines = [line for line in split(multi_line, '\n') if occursin("=", line)]
-    ip_dict = Dict(Symbol(replace(split(string(line), "=")[1], r"\s+" => "")) => replace(split(string(line), "=")[2], r"\s+" => "") for line in filtered_lines)
-    field_types = fieldtypes(TGLFNN.InputTGLF)
+    ip_dict = Dict()
+    if all(line -> contains(line, "="), lines)
+        println("input.tglf file type detected")
+        for line in lines
+            field, value = map(strip, split(line, "="))
+            ip_dict[Symbol(field)] = value
+        end
+    elseif !all(line -> contains(line, "="), lines)
+        println("input.tglf.gen file type detected")
+        for line in lines
+            value, field = map(strip, split(line, "  "))
+            ip_dict[Symbol(field)] = value
+        end
+    else
+        error("invalid input.tglf or input.tglf.gen file")
+    end
 
-    for (idx, name) in enumerate(fieldnames(typeof(input_tglf)))
+    field_types = fieldtypes(TGLFNN.InputTGLF)
+    for (idx, field) in enumerate(fieldnames(typeof(input_tglf)))
         if typeof(field_types[idx]) <: Union
             type_of_item = field_types[idx].b
         else
-            type_of_item = typeof(field_types[idx])
+            type_of_item = field_types[idx]
         end
-        if name ∉ keys(ip_dict)
+        if field ∉ keys(ip_dict)
             continue
         end
-        if ip_dict[name] == "T" || ip_dict[name] == ".true."
-            setproperty!(input_tglf, name, true)
-        elseif type_of_item == "F"
-            ip_dict[name] == ".false."
-            setproperty!(input_tglf, name, false)
+        if ip_dict[field] == "T" || ip_dict[field] == ".true."
+            setproperty!(input_tglf, field, true)
+        elseif type_of_item == "F" || ip_dict[field] == ".false."
+            setproperty!(input_tglf, field, false)
         elseif type_of_item <: Float64
-            setproperty!(input_tglf, name, parse(Float64, ip_dict[name]))
+            setproperty!(input_tglf, field, parse(Float64, ip_dict[field]))
         elseif type_of_item <: Int64
-            setproperty!(input_tglf, name, Int(parse(Float64, ip_dict[name])))
+            setproperty!(input_tglf, field, Int(parse(Float64, ip_dict[field])))
         elseif type_of_item <: String
-            setproperty!(input_tglf, name, ip_dict[name])
+            setproperty!(input_tglf, field, ip_dict[field])
+        else
+            error("parameter $field of type ($type_of_item) not recognized: $(ip_dict[field])")
         end
     end
     return input_tglf
+end
+
+"""
+    load(filename::AbstractString)
+
+Reads filename (`input.tglf` or `input.tglf.gen` format) and returns input_tglf::InputTGLF
+"""
+function load(filename::String)
+    return load(InputTGLF(), filename)
 end
 
 """

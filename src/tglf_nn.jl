@@ -160,10 +160,12 @@ function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bou
     xx = [contains(name, "_log10") ? log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
     if warn_nn_train_bounds # training bounds are on the original data but after log10
         for ix in eachindex(xx)
-            if xx[ix] < fluxmodel.xbounds[ix, 1]
-                @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(minimum(xx[ix,:])) is below bound of $(fluxmodel.xbounds[ix,1])")
+            if isnan(xx[ix]) || isinf(xx[ix])
+                error("$(fluxmodel.xnames[ix]) = $(x[ix]) is not allowed")
+            elseif xx[ix] < fluxmodel.xbounds[ix, 1]
+                @warn("Extrapolation $(fluxmodel.xnames[ix])=$(minimum(xx[ix,:])) is below training bound of $(fluxmodel.xbounds[ix,:])")
             elseif xx[ix] > fluxmodel.xbounds[ix, 2]
-                @warn("Extrapolation warning on $(fluxmodel.xnames[ix])=$(maximum(xx[ix,:])) is above bound of $(fluxmodel.xbounds[ix,2])")
+                @warn("Extrapolation $(fluxmodel.xnames[ix])=$(maximum(xx[ix,:])) is above training bound of $(fluxmodel.xbounds[ix,:])")
             end
         end
     end
@@ -187,7 +189,7 @@ function flux_array(fluxensemble::TGLFNNensemble, x::AbstractArray; uncertain::B
 
     tmp = zeros(nmodels, nouts, nsamples)
     Threads.@threads for k in 1:length(fluxensemble.models)
-        tmp[k, :, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds, fidelity)
+        tmp[k, :, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds=(warn_nn_train_bounds && k == 1), fidelity)
     end
 
     mean, std = StatsBase.mean_and_std(tmp, 1; corrected=true)
@@ -207,7 +209,7 @@ function flux_array(fluxensemble::TGLFNNensemble, x::AbstractVector; uncertain::
 
     tmp = zeros(nmodels, nouts)
     Threads.@threads for k in 1:length(fluxensemble.models)
-        tmp[k, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds, fidelity)
+        tmp[k, :] = flux_array(fluxensemble.models[k], x; warn_nn_train_bounds=(warn_nn_train_bounds && k == 1), fidelity)
     end
 
     mean, std = StatsBase.mean_and_std(tmp, 1; corrected=true)
@@ -261,8 +263,7 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
     inputs = zeros(length(tglfmod.xnames))
     for (k, item) in enumerate(tglfmod.xnames)
         item = replace(item, "_log10" => "")
-        value = getfield(input_tglf, Symbol(item))
-        inputs[k] = value
+        inputs[k] = getfield(input_tglf, Symbol(item))
     end
     sol = tglfmod(inputs...; uncertain, warn_nn_train_bounds, fidelity=:TGLFNN)
     if fidelity == :GKNN
