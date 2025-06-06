@@ -1,2 +1,0 @@
-*/committee.pt filter=lfs diff=lfs merge=lfs -text
-models/*/committee.pt filter=lfs diff=lfs merge=lfs -text
