@@ -10,7 +10,6 @@ import ONNXRunTime as ORT
 using ONNXRunTime.CAPI
 using ONNXRunTime: testdatapath
 
-
 #= ====================================== =#
 #  structs/constructors for the TGLFmodel
 #= ====================================== =#
