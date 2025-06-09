@@ -99,21 +99,21 @@ function InputTGLF(
     Bt = eqt.global_quantities.vacuum_toroidal_field.b0
     buitp = IMAS.interp1d(rho_eq, GACODE.bunit(eqt1d))
     bunit = @. @views buitp(rho_cp[gridpoint_cp]) * T_to_Gauss
-    input_tglf = InputTGLFs([InputTGLF() for k in eachindex(gridpoint_cp)])
+    input_tglfs = InputTGLFs([InputTGLF() for k in eachindex(gridpoint_cp)])
 
     signb = sign(Bt)
-    input_tglf.SIGN_BT = signb
-    input_tglf.SIGN_IT = @. signb * sign(q)
+    input_tglfs.SIGN_BT = signb
+    getview(input_tglfs, :SIGN_IT) .= @. signb * sign(q)
 
-    input_tglf.NS = length(ions) + 1 # add 1 to include electrons
+    input_tglfs.NS = length(ions) + 1 # add 1 to include electrons
 
     # electrons first for TGLF
-    input_tglf.MASS_1 = me / md
-    input_tglf.TAUS_1 = 1.0
-    input_tglf.AS_1 = 1.0
-    input_tglf.ZS_1 = -1.0
-    input_tglf.RLNS_1 = @. a * dlnnedr
-    input_tglf.RLTS_1 = @. a * dlntedr
+    input_tglfs.MASS_1 = me / md
+    input_tglfs.TAUS_1 = 1.0
+    input_tglfs.AS_1 = 1.0
+    input_tglfs.ZS_1 = -1.0
+    getview(input_tglfs, :RLNS_1) .= @. a * dlnnedr
+    getview(input_tglfs, :RLTS_1) .= @. a * dlntedr
 
     c_s = GACODE.c_s.(Te)
     w0 = @. -cp1d.rotation_frequency_tor_sonic
@@ -121,9 +121,9 @@ function InputTGLF(
     gamma_p = @. @views -Rmaj[gridpoint_cp] * w0p[gridpoint_cp]
     gamma_e = @. @views -rmin[gridpoint_cp] / q * w0p[gridpoint_cp]
     mach = @. @views Rmaj[gridpoint_cp] * w0[gridpoint_cp] / c_s
-    input_tglf.VPAR_1 = @. -input_tglf.SIGN_IT * mach
-    input_tglf.VPAR_SHEAR_1 = @. -input_tglf.SIGN_IT * (a / c_s) * gamma_p
-    input_tglf.VEXB_SHEAR = @. -gamma_e * (a / c_s)
+    getview(input_tglfs, :VPAR_1) .= @. -input_tglfs.SIGN_IT * mach
+    getview(input_tglfs, :VPAR_SHEAR_1) .= @. -input_tglfs.SIGN_IT * (a / c_s) * gamma_p
+    getview(input_tglfs, :VEXB_SHEAR) .= @. -gamma_e * (a / c_s)
 
     for iion in eachindex(ions)
         species = iion + 1
@@ -133,102 +133,102 @@ function InputTGLF(
         @views dlntidr = dlntidr_full[gridpoint_cp]
 
         Zi = IMAS.avgZ(ions[iion].element[1].z_n, Ti)
-        setproperty!(input_tglf, Symbol("ZS_$species"), Zi)
-        setproperty!(input_tglf, Symbol("MASS_$species"), ions[iion].element[1].a .* mp ./ md)
+        setproperty!(input_tglfs, Symbol("ZS_$species"), Zi)
+        setproperty!(input_tglfs, Symbol("MASS_$species"), ions[iion].element[1].a .* mp ./ md)
 
         ni_full = ions[iion].density_thermal ./ m³_to_cm³
         dlnnidr_full = .-IMAS.calc_z(rmin, ni_full, :backward)
         @views ni = ni_full[gridpoint_cp]
         @views dlnnidr = dlnnidr_full[gridpoint_cp]
 
-        setproperty!(input_tglf, Symbol("TAUS_$species"), Ti ./ Te)
-        setproperty!(input_tglf, Symbol("AS_$species"), ni ./ ne)
-        setproperty!(input_tglf, Symbol("VPAR_$species"), input_tglf.VPAR_1)
-        setproperty!(input_tglf, Symbol("VPAR_SHEAR_$species"), input_tglf.VPAR_SHEAR_1)
-        setproperty!(input_tglf, Symbol("RLNS_$species"), a .* dlnnidr)
-        setproperty!(input_tglf, Symbol("RLTS_$species"), a .* dlntidr)
+        setproperty!(input_tglfs, Symbol("TAUS_$species"), Ti ./ Te)
+        setproperty!(input_tglfs, Symbol("AS_$species"), ni ./ ne)
+        setproperty!(input_tglfs, Symbol("VPAR_$species"), input_tglfs.VPAR_1)
+        setproperty!(input_tglfs, Symbol("VPAR_SHEAR_$species"), input_tglfs.VPAR_SHEAR_1)
+        setproperty!(input_tglfs, Symbol("RLNS_$species"), a .* dlnnidr)
+        setproperty!(input_tglfs, Symbol("RLTS_$species"), a .* dlntidr)
     end
 
-    input_tglf.BETAE = @. 8π * ne * k * Te / bunit^2
-    input_tglf.XNUE = @. a / c_s * sqrt(ions[1].element[1].a) * e^4 * π * ne * (24.0 - log(sqrt(ne) / Te)) / (sqrt(me) * (k * Te)^1.5)
-    input_tglf.ZEFF = @views cp1d.zeff[gridpoint_cp]
+    getview(input_tglfs, :BETAE) .= @. 8π * ne * k * Te / bunit^2
+    getview(input_tglfs, :XNUE) .= @. a / c_s * sqrt(ions[1].element[1].a) * e^4 * π * ne * (24.0 - log(sqrt(ne) / Te)) / (sqrt(me) * (k * Te)^1.5)
+    getview(input_tglfs, :ZEFF) .= @views cp1d.zeff[gridpoint_cp]
     rho_s = @views GACODE.rho_s(cp1d, eqt)[gridpoint_cp]
-    input_tglf.DEBYE = @. 7.43e2 * sqrt(Te / ne) / rho_s
-    input_tglf.RMIN_LOC = @. @views rmin[gridpoint_cp] / a
-    input_tglf.RMAJ_LOC = @. @views Rmaj[gridpoint_cp] / a
-    input_tglf.ZMAJ_LOC = 0
-    input_tglf.DRMINDX_LOC = 1.0
+    getview(input_tglfs, :DEBYE) .= @. 7.43e2 * sqrt(Te / ne) / rho_s
+    getview(input_tglfs, :RMIN_LOC) .= @. @views rmin[gridpoint_cp] / a
+    getview(input_tglfs, :RMAJ_LOC) .= @. @views Rmaj[gridpoint_cp] / a
+    input_tglfs.ZMAJ_LOC = 0
+    input_tglfs.DRMINDX_LOC = 1.0
 
     drmaj = IMAS.gradient(rmin, Rmaj)
 
-    input_tglf.DRMAJDX_LOC = @views drmaj[gridpoint_cp]
-    input_tglf.DZMAJDX_LOC = 0.0
+    input_tglfs.DRMAJDX_LOC = @views drmaj[gridpoint_cp]
+    input_tglfs.DZMAJDX_LOC = 0.0
 
-    input_tglf.Q_LOC = @. abs(q)
+    getview(input_tglfs, :Q_LOC) .= @. abs(q)
 
-    input_tglf.KAPPA_LOC = @views kappa[gridpoint_cp]
+    input_tglfs.KAPPA_LOC = @views kappa[gridpoint_cp]
 
     skappa = rmin .* IMAS.gradient(rmin, kappa) ./ kappa
     sdelta = rmin .* IMAS.gradient(rmin, delta)
     szeta = rmin .* IMAS.gradient(rmin, zeta)
 
-    input_tglf.S_KAPPA_LOC = @views skappa[gridpoint_cp]
-    input_tglf.DELTA_LOC = @views delta[gridpoint_cp]
-    input_tglf.S_DELTA_LOC = @views sdelta[gridpoint_cp]
-    input_tglf.ZETA_LOC = @views zeta[gridpoint_cp]
-    input_tglf.S_ZETA_LOC = @views szeta[gridpoint_cp]
+    input_tglfs.S_KAPPA_LOC = @views skappa[gridpoint_cp]
+    input_tglfs.DELTA_LOC = @views delta[gridpoint_cp]
+    input_tglfs.S_DELTA_LOC = @views sdelta[gridpoint_cp]
+    input_tglfs.ZETA_LOC = @views zeta[gridpoint_cp]
+    input_tglfs.S_ZETA_LOC = @views szeta[gridpoint_cp]
 
     press = cp1d.pressure_thermal
     Pa_to_dyn = 10.0
 
     dpdr = @views IMAS.gradient(rmin, press)[gridpoint_cp] .* Pa_to_dyn
-    input_tglf.P_PRIME_LOC = @. @views abs(q) / (rmin[gridpoint_cp] / a)^2 * rmin[gridpoint_cp] / bunit^2 * dpdr
+    getview(input_tglfs, :P_PRIME_LOC) .= @. @views abs(q) / (rmin[gridpoint_cp] / a)^2 * rmin[gridpoint_cp] / bunit^2 * dpdr
 
     dqdr = @views IMAS.gradient(rmin, q_profile)[gridpoint_cp]
-    input_tglf.Q_PRIME_LOC = @. @views q * a^2 / rmin[gridpoint_cp] * dqdr
+    getview(input_tglfs, :Q_PRIME_LOC) .= @. @views q * a^2 / rmin[gridpoint_cp] * dqdr
 
     # saturation rules
-    input_tglf.ALPHA_ZF = 1.0 # 1 = default, -1 = low ky cutoff kypeak search
-    input_tglf.USE_MHD_RULE = false
-    input_tglf.NMODES = input_tglf.NS .+ 2 # capture main branches: ES each species + BPER + VPAR_SHEAR
-    input_tglf.NKY = 12 # 12 is default, 16 for smoother spectrum
-    input_tglf.ALPHA_QUENCH = 0 # 0 = spectral shift, 1 = quench
-    input_tglf.SAT_RULE = parse(Int, split(string(sat), "sat")[end])
+    input_tglfs.ALPHA_ZF = 1.0 # 1 = default, -1 = low ky cutoff kypeak search
+    input_tglfs.USE_MHD_RULE = false
+    input_tglfs.NMODES = input_tglfs.NS .+ 2 # capture main branches: ES each species + BPER + VPAR_SHEAR
+    input_tglfs.NKY = 12 # 12 is default, 16 for smoother spectrum
+    input_tglfs.ALPHA_QUENCH = 0 # 0 = spectral shift, 1 = quench
+    input_tglfs.SAT_RULE = parse(Int, split(string(sat), "sat")[end])
     if sat == :sat2 || sat == :sat3
-        input_tglf.UNITS = "CGYRO"
-        input_tglf.KYGRID_MODEL = 4
-        input_tglf.NBASIS_MIN = 2
-        input_tglf.NBASIS_MAX = 6
-        input_tglf.USE_AVE_ION_GRID = true
-        input_tglf.XNU_MODEL = 3
-        input_tglf.WDIA_TRAPPED = 1.0
+        input_tglfs.UNITS = "CGYRO"
+        input_tglfs.KYGRID_MODEL = 4
+        input_tglfs.NBASIS_MIN = 2
+        input_tglfs.NBASIS_MAX = 6
+        input_tglfs.USE_AVE_ION_GRID = true
+        input_tglfs.XNU_MODEL = 3
+        input_tglfs.WDIA_TRAPPED = 1.0
     else
-        input_tglf.UNITS = "GYRO"
+        input_tglfs.UNITS = "GYRO"
         if sat == :sat1
         elseif sat == :sat1geo
-            input_tglf.UNITS = "CGYRO"
+            input_tglfs.UNITS = "CGYRO"
         elseif sat == :sat0quench
-            input_tglf.ALPHA_QUENCH = 1
+            input_tglfs.ALPHA_QUENCH = 1
         end
-        input_tglf.KYGRID_MODEL = 1
-        input_tglf.NBASIS_MIN = 2
-        input_tglf.NBASIS_MAX = 4
-        input_tglf.USE_AVE_ION_GRID = false # default is false
-        input_tglf.XNU_MODEL = 2
-        input_tglf.WDIA_TRAPPED = 0.0
+        input_tglfs.KYGRID_MODEL = 1
+        input_tglfs.NBASIS_MIN = 2
+        input_tglfs.NBASIS_MAX = 4
+        input_tglfs.USE_AVE_ION_GRID = false # default is false
+        input_tglfs.XNU_MODEL = 2
+        input_tglfs.WDIA_TRAPPED = 0.0
     end
 
     # electrostatic/electromagnetic
     if electromagnetic
-        input_tglf.USE_BPER = true
-        input_tglf.USE_BPAR = true
+        input_tglfs.USE_BPER = true
+        input_tglfs.USE_BPAR = true
     else
-        input_tglf.USE_BPER = false
-        input_tglf.USE_BPAR = false
+        input_tglfs.USE_BPER = false
+        input_tglfs.USE_BPAR = false
     end
 
-    input_tglf.ALPHA_MACH = 0.0
-    return input_tglf
+    input_tglfs.ALPHA_MACH = 0.0
+    return input_tglfs
 end
 
 """

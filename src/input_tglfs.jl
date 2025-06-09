@@ -35,3 +35,42 @@ end
 function Base.getindex(inputTGLFs::InputTGLFs, index::Int)
     return getfield(inputTGLFs, :tglfs)[index]
 end
+
+
+"""
+    FieldView(parent, field) <: AbstractVector
+
+A one-dimensional view of a single field `field` across all
+`InputTGLF`s stored in `parent::InputTGLFs`.
+No data are copied: every access delegates to `getproperty` /
+`setproperty!` on the corresponding struct.
+"""
+struct FieldView{T} <: AbstractVector{T}
+    parent :: InputTGLFs
+    field  :: Symbol
+end
+
+# -- AbstractVector interface -------------------------------------------
+Base.IndexStyle(::Type{<:FieldView}) = IndexLinear()
+Base.size(v::FieldView)    = (length(v.parent.tglfs),)
+Base.length(v::FieldView)  = length(v.parent.tglfs)
+
+@inline Base.getindex(v::FieldView, i::Int) =
+    getproperty(v.parent.tglfs[i], v.field)
+
+@inline function Base.setindex!(v::FieldView, x, i::Int)
+    setproperty!(v.parent.tglfs[i], v.field, x)
+end
+
+# Tell broadcast we are already a container
+Base.broadcastable(v::FieldView) = v
+
+"""
+    getview(A::InputTGLFs, field::Symbol) -> FieldView
+
+Return a proxy vector that points to `field` inside each element of `A.tglfs`.
+"""
+function getview(A::InputTGLFs, field::Symbol)
+    FT = fieldtype(InputTGLF, field)
+    return FieldView{FT}(A, field)
+end
