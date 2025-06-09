@@ -174,7 +174,7 @@ Base.@kwdef mutable struct InputCGYRO
 end
 
 function InputCGYRO(dd::IMAS.dd, gridpoint_cp::Integer, lump_ions::Bool)
-    input_cgyro = TGLFNN.InputCGYRO()
+    input_cgyro = InputCGYRO()
 
     eq = dd.equilibrium
     eqt = eq.time_slice[]

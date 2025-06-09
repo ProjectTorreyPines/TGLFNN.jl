@@ -99,7 +99,7 @@ function InputTGLF(
     Bt = eqt.global_quantities.vacuum_toroidal_field.b0
     buitp = IMAS.interp1d(rho_eq, GACODE.bunit(eqt1d))
     bunit = @. @views buitp(rho_cp[gridpoint_cp]) * T_to_Gauss
-    input_tglf = InputTGLFs([TGLFNN.InputTGLF() for k in eachindex(gridpoint_cp)])
+    input_tglf = InputTGLFs([InputTGLF() for k in eachindex(gridpoint_cp)])
 
     signb = sign(Bt)
     input_tglf.SIGN_BT = signb
@@ -256,7 +256,7 @@ function load(input_tglf::InputTGLF, filename::String)
         error("invalid input.tglf or input.tglf.gen file")
     end
 
-    field_types = fieldtypes(TGLFNN.InputTGLF)
+    field_types = fieldtypes(InputTGLF)
     for (idx, field) in enumerate(fieldnames(typeof(input_tglf)))
         if typeof(field_types[idx]) <: Union
             type_of_item = field_types[idx].b
@@ -347,7 +347,7 @@ NOTE: Each run is done asyncronously (ie. in separate parallel processes)
 Returns a `FluxSolution` structure
 """
 function run_tglf(input_tglfs::Vector{InputTGLF})
-    return collect(asyncmap(input_tglf -> TGLFNN.run_tglf(input_tglf), input_tglfs))
+    return collect(asyncmap(input_tglf -> run_tglf(input_tglf), input_tglfs))
 end
 
 export run_tglf

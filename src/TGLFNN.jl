@@ -3,7 +3,7 @@ module TGLFNN
 using IMAS
 using IMASutils: argmin_abs
 import TJLF
-import TJLF:InputTGLF, InputTJLF
+import TJLF: InputTGLF, InputTJLF
 import GACODE
 
 include("tglf.jl")

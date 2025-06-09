@@ -71,7 +71,7 @@ Returns a vector of `FluxSolution` structures
 """
 function run_qlgyro(input_qlgyros::Vector{InputQLGYRO}, input_cgyros::Vector{InputCGYRO})
     @assert length(input_qlgyros) == length(input_cgyros)
-    return collect(map((input_qlgyro, input_cgyro) -> TGLFNN.run_qlgyro(input_qlgyro, input_cgyro), input_qlgyros, input_cgyros))
+    return collect(map((input_qlgyro, input_cgyro) -> run_qlgyro(input_qlgyro, input_cgyro), input_qlgyros, input_cgyros))
 end
 
 export run_qlgyro

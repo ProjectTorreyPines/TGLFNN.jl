@@ -11,7 +11,7 @@ end
 
 Modifies an InputTJLF from a InputTGLF
 """
-function update_input_tjlf!(input_tjlf::InputTJLF, input_tglf::TGLFNN.InputTGLF)
+function update_input_tjlf!(input_tjlf::InputTJLF, input_tglf::InputTGLF)
     input_tjlf.NWIDTH = 21
 
     for fieldname in intersect(fieldnames(typeof(input_tglf)), fieldnames(typeof(input_tjlf)))
