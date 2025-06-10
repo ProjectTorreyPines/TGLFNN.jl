@@ -151,12 +151,16 @@ end
 #= ==================================== =#
 #  functions to get the fluxes solution
 #= ==================================== =#
-function flux_array(fluxmodel::TGLFNNmodel, x::AbstractMatrix; warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
-    return hcat(collect(map(x0 -> flux_array(fluxmodel, x0; warn_nn_train_bounds, fidelity), eachslice(x; dims=2)))...)
+function flux_array(fluxmodel::TGLFNNmodel, x::AbstractMatrix{T}; warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN) where {T}
+    N, _ = size(x)
+    xx = Vector{T}(undef, N)
+    return hcat(collect(map(x0 -> flux_array(fluxmodel, x0; warn_nn_train_bounds, fidelity, xx), eachslice(x; dims=2)))...)
 end
 
-function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector; warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN)
-    xx = [contains(name, "_log10") ? log10.(x[ix]) : x[ix] for (ix, name) in enumerate(fluxmodel.xnames)]
+function flux_array(fluxmodel::TGLFNNmodel, x::AbstractVector{T}; warn_nn_train_bounds::Bool=true, fidelity::Symbol=:TGLFNN, xx::Vector{T}=similar(x)) where{T}
+    for (ix, name) in enumerate(fluxmodel.xnames)
+        xx[ix] = contains(name, "_log10") ? log10(x[ix]) : x[ix]
+    end
     if warn_nn_train_bounds # training bounds are on the original data but after log10
         for ix in eachindex(xx)
             if isnan(xx[ix]) || isinf(xx[ix])
