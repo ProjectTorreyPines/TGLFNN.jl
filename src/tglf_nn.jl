@@ -301,6 +301,8 @@ The warn_nn_train_bounds checks against the standard deviation of the inputs to 
 
 Returns a vector of `flux_solution` structures
 """
+const log_suffix = "_log10"
+const n_log_suffix = ncodeunits(log_suffix)
 function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, uncertain::Bool=false, warn_nn_train_bounds::Bool, fidelity::Symbol=:TGLFNN)
     if model_filename in ["sat3_em_d3d_azf-1"] && fidelity == :GKNN
         tglfmod = loadmodelonce(model_filename * "_tglfnn24")
@@ -310,8 +312,12 @@ function run_tglfnn(input_tglfs::Vector{InputTGLF}; model_filename::String, unce
     inputs = zeros(length(tglfmod.xnames), length(input_tglfs))
     for (i, input_tglf) in enumerate(input_tglfs)
         for (k, item) in enumerate(tglfmod.xnames)
-            item = replace(item, "_log10" => "")
-            value = getfield(input_tglf, Symbol(item))
+            if endswith(item, log_suffix)
+                subitem = SubString(item, firstindex(item), prevind(item, lastindex(item), n_log_suffix))
+                value = getfield(input_tglf, Symbol(subitem))
+            else
+                value = getfield(input_tglf, Symbol(item))
+            end
             inputs[k, i] = value
         end
     end
