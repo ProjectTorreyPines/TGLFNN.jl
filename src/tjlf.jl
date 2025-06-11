@@ -4,6 +4,6 @@ function run_tjlf(input_tjlf::InputTJLF)
 end
 
 function run_tjlf(input_tglf::InputTGLF)
-    input_tjlf = InputTJLF(input_tglf)
+    input_tjlf = InputTJLF{Float64}(input_tglf)
     return run_tjlf(input_tjlf)
 end
