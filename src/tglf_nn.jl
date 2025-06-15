@@ -270,8 +270,8 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
     end
     sol = tglfmod(inputs...; uncertain, warn_nn_train_bounds, fidelity=:TGLFNN)
     if fidelity == :GKNN
+        base_fluxes = [sol.ENERGY_FLUX_e, sol.ENERGY_FLUX_i, sol.PARTICLE_FLUX_e, sol.STRESS_TOR_i]
         if model_filename in ["sat3_em_d3d_azf-1"]
-            base_fluxes = [sol.ENERGY_FLUX_e, sol.ENERGY_FLUX_i, sol.PARTICLE_FLUX_e, sol.STRESS_TOR_i]
             gknne = TGLFNN.loadmodelonce(model_filename * "_gknne24")
             err_e = flux_array(gknne, vcat(inputs, base_fluxes[1]); uncertain, warn_nn_train_bounds, fidelity)
             gknni = loadmodelonce(model_filename * "_gknni24")
@@ -289,13 +289,13 @@ function run_tglfnn(input_tglf::InputTGLF; model_filename::String, uncertain::Bo
             )
         elseif model_filename in ["sat3_em_d3d+mastu+nstx_azf-1", "sat2_em_d3d+mastu+nstx_azf-1"]
             gknn = loadmodelonce(model_filename * "_gknn25")
-            err = flux_array(gknn, vcat(inputs, sol); uncertain, warn_nn_train_bounds, fidelity)
+            err = flux_array(gknn, vcat(inputs, [base_fluxes[3], base_fluxes[4], base_fluxes[1], base_fluxes[2]]); uncertain, warn_nn_train_bounds, fidelity)
             sol = GACODE.FluxSolution(
-                sol.ENERGY_FLUX_e * err[1],
-                sol.ENERGY_FLUX_i * err[2],
-                sol.PARTICLE_FLUX_e * err[3],
+                sol.ENERGY_FLUX_e * err[3],
+                sol.ENERGY_FLUX_i * err[4],
+                sol.PARTICLE_FLUX_e * err[1],
                 Float64[],                   # PARTICLE_FLUX_i (empty for this model)
-                sol.STRESS_TOR_i * err[4]
+                sol.STRESS_TOR_i * err[2]
             )
         end
     end
