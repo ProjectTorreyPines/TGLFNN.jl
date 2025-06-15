@@ -16,7 +16,7 @@ function save(input::Union{InputTGLF,InputCGYRO,InputQLGYRO}, filename::Abstract
                 elseif isa(value, Int)
                     println(io, "$(key)=$(convert(Int, value))")
                 elseif isa(value, String)
-                    println(io, "$(key)='$value'")
+                    println(io, "$(key)=$value")
                 elseif isa(value, Bool)
                     println(io, "$(key)=.$value.")
                 else
